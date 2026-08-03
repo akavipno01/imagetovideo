@@ -49,11 +49,11 @@ app.add_middleware(
 class GenerateRequest(BaseModel):
     prompt: str = Field(..., description="Văn bản mô tả nội dung cần tạo ảnh và video", example="A futuristic neon city at sunset, 4k hyperrealistic")
     negative_prompt: str = Field("", description="Các chi tiết không mong muốn trong ảnh", example="blurry, bad quality, distortion")
-    width: int = Field(512, ge=256, le=1024, description="Chiều rộng ảnh")
-    height: int = Field(512, ge=256, le=1024, description="Chiều cao ảnh")
+    width: int = Field(512, ge=256, le=2048, description="Chiều rộng ảnh")
+    height: int = Field(512, ge=256, le=2048, description="Chiều cao ảnh")
     num_inference_steps: int = Field(20, ge=1, le=100, description="Số bước khuếch tán sinh ảnh Stable Diffusion")
     motion_type: str = Field("zoom_in", description="Hiệu ứng chuyển động camera 3D: zoom_in, zoom_out, pan_left, pan_right, 3d_parallax, circle_orbit")
-    num_frames: int = Field(30, ge=10, le=120, description="Tổng số khung hình cho video")
+    num_frames: int = Field(30, ge=10, le=600, description="Tổng số khung hình cho video")
     fps: int = Field(15, ge=5, le=60, description="Tốc độ khung hình (khung hình / giây)")
 
 
