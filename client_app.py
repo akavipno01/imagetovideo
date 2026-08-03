@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
 ===============================================================================
-🎬 AI IMAGE & TEXT TO VIDEO BATCH STUDIO v4.1
+🎬 AI IMAGE & TEXT TO VIDEO BATCH STUDIO v4.2 (Render Image Only Support)
 ===============================================================================
 Ứng dụng Client GUI chuyên nghiệp kết nối API Image-to-Video Server.
 
-Tính năng mới v4.1:
-- Tab 1 ("Text to video"): Loại bỏ tùy chọn luồng (chạy tuần tự chuẩn xác), giữ nguyên Checkbox "🖼️ Tải Kèm Ảnh AI Gốc (.png)".
-- Tab 2 ("Image to video"): Đặt MẶC ĐỊNH 4 LUỒNG song song (Tối đa 4 luồng).
+Tính năng mới v4.2:
+- Thêm nút "🎨 CHỈ RENDER ÁNH" trong Tab 1 ("Text to video"):
+  Tự động gửi danh sách prompt lên API /generate-image để CHỈ tạo ảnh .png và lưu về thư mục output.
+- Tab 1 ("Text to video"): 2 nút chọn linh hoạt (Render Video hoặc Chỉ Render Ảnh).
+- Tab 2 ("Image to video"): Đặt MẶC ĐỊNH 4 LUỒNG song song (Workers = 4).
 - Mặc định: Frame = 360, FPS = 20 (Độ phân giải 1080 x 720 HD, Random Hiệu Ứng 3D).
 - Bảng Monitor bên phải (Right Panel) hiển thị Real-time Log các lượt gọi GET /status/{task_id}.
 - Mặc định mở ở chế độ Full Screen maximized.
@@ -75,7 +77,7 @@ RESOLUTION_PRESETS = {
 class ProfessionalVideoStudioApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("AI Image & Text To Video Batch Studio v4.1 (Full Screen)")
+        self.title("AI Image & Text To Video Batch Studio v4.2 (Render Image Only)")
         
         # Đặt kích thước cơ sở & Phóng to Toàn màn hình (Full Screen Maximized)
         self.geometry("1360x860")
@@ -156,6 +158,9 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"), padding=9, background=self.colors["accent"], foreground="#11111b")
         self.style.map("Accent.TButton", background=[("active", self.colors["accent_hover"]), ("disabled", "#313244")], foreground=[("disabled", "#6c7086")])
 
+        self.style.configure("Secondary.TButton", font=("Segoe UI", 10, "bold"), padding=9, background="#cba6f7", foreground="#11111b")
+        self.style.map("Secondary.TButton", background=[("active", "#f5c2e7"), ("disabled", "#313244")], foreground=[("disabled", "#6c7086")])
+
         self.style.configure("Danger.TButton", font=("Segoe UI", 10, "bold"), padding=9, background=self.colors["danger"], foreground="#11111b")
         self.style.map("Danger.TButton", background=[("active", "#f5e0dc")])
 
@@ -209,12 +214,12 @@ class ProfessionalVideoStudioApp(tk.Tk):
         header_panel = ttk.Frame(self, style="Card.TFrame", padding=(16, 12))
         header_panel.pack(fill="x", padx=14, pady=(12, 6))
 
-        lbl_logo = ttk.Label(header_panel, text="🎬 AI IMAGE & TEXT TO VIDEO STUDIO v4.1", style="Title.TLabel")
+        lbl_logo = ttk.Label(header_panel, text="🎬 AI IMAGE & TEXT TO VIDEO STUDIO v4.2", style="Title.TLabel")
         lbl_logo.pack(anchor="w")
 
         lbl_desc = ttk.Label(
             header_panel,
-            text="Hệ thống Render Batch Video 3D | Tab Image to Video Mặc Định 4 Luồng Song Song & Tải Kèm Ảnh AI Gốc",
+            text="Hệ thống Render Batch Video 3D | Hỗ trợ Chế Độ 'Chỉ Render Ảnh' & Image to Video 4 Luồng Song Song",
             style="Sub.TLabel",
         )
         lbl_desc.pack(anchor="w", pady=(2, 0))
@@ -239,7 +244,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.lbl_connection_badge.grid(row=0, column=3, padx=12, pady=4, sticky="e")
 
         # Hàng 2: Thư mục đầu ra (Output Directory)
-        lbl_out = ttk.Label(server_card, text="📁 Thư Mục Lưu Video:", style="Card.TLabel", font=("Segoe UI", 10, "bold"))
+        lbl_out = ttk.Label(server_card, text="📁 Thư Mục Lưu Output:", style="Card.TLabel", font=("Segoe UI", 10, "bold"))
         lbl_out.grid(row=1, column=0, sticky="w", padx=4, pady=4)
 
         entry_out = ttk.Entry(server_card, textvariable=self.output_dir_var, font=("Segoe UI", 10, "bold"), width=54)
@@ -365,7 +370,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
         )
         self.txt_prompts.insert("1.0", sample_prompts)
 
-        # CẤU HÌNH THAM SỐ TAB 1 (FRAME=360, FPS=20, ĐÃ BỎ PHẦN SỐ LUỒNG, CÓ CHECKBOX TẢI ÁNH)
+        # CẤU HÌNH THAM SỐ TAB 1
         opts_card = ttk.Frame(self.tab_text, style="Card.TFrame", padding=10)
         opts_card.pack(fill="x", pady=6)
 
@@ -411,18 +416,26 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.spn_txt_fps.set(20)  # MẶC ĐỊNH 20 FPS
         self.spn_txt_fps.grid(row=1, column=5, padx=4, pady=4)
 
-        # Hàng 3: CHECKBOX TẢI KÈM ÁNH AI GỐC (.PNG) (Đã bỏ tùy chọn số luồng ở Tab 1)
-        chk_save_img = ttk.Checkbutton(opts_card, text="🖼️ Tải Kèm Ảnh AI Gốc (.png)", variable=self.chk_txt_save_img_var, style="TCheckbutton")
+        # Hàng 3: CHECKBOX TẢI KÈM ÁNH AI GỐC (.PNG)
+        chk_save_img = ttk.Checkbutton(opts_card, text="🖼️ Tải Kèm Ảnh AI Gốc (.png) Khi Render Video", variable=self.chk_txt_save_img_var, style="TCheckbutton")
         chk_save_img.grid(row=2, column=0, columnspan=6, sticky="w", padx=4, pady=4)
 
         btn_action_frame = ttk.Frame(self.tab_text)
         btn_action_frame.pack(fill="x", pady=8)
 
+        # NÚT 1: RENDER CẢ VIDEO (VÀ ÁNH NẾU CHỌN CHECKBOX)
         self.btn_run_text = ttk.Button(
-            btn_action_frame, text="🚀 KHỞI CHẠY RENDER DANH SÁCH TEXT PROMPTS", style="Accent.TButton", command=self.start_text_batch
+            btn_action_frame, text="🚀 RENDER VIDEO DẠNG BATCH", style="Accent.TButton", command=self.start_text_batch
         )
         self.btn_run_text.pack(side="left", padx=(0, 8))
 
+        # NÚT 2: CHỈ RENDER ÁNH PROMPTS
+        self.btn_run_image_only = ttk.Button(
+            btn_action_frame, text="🎨 CHỈ RENDER ÁNH", style="Secondary.TButton", command=self.start_image_only_text_batch
+        )
+        self.btn_run_image_only.pack(side="left", padx=(0, 8))
+
+        # NÚT 3: DỪNG TIẾN TRÌNH
         self.btn_stop_text = ttk.Button(btn_action_frame, text="⏹️ DỪNG TIẾN TRÌNH", style="Danger.TButton", command=self.request_stop, state="disabled")
         self.btn_stop_text.pack(side="left")
 
@@ -534,7 +547,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
         return url
 
     def browse_output_dir(self):
-        path = filedialog.askdirectory(title="Chọn Thư Mục Lưu Video Kết Quả")
+        path = filedialog.askdirectory(title="Chọn Thư Mục Lưu Output")
         if path:
             self.output_dir_var.set(path)
 
@@ -586,6 +599,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
         state_run = "disabled" if running else "normal"
         state_stop = "normal" if running else "disabled"
         self.btn_run_text.config(state=state_run)
+        self.btn_run_image_only.config(state=state_run)
         self.btn_run_img.config(state=state_run)
         self.btn_stop_text.config(state=state_stop)
         self.btn_stop_img.config(state=state_stop)
@@ -687,7 +701,70 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.status_log(f"⏹️ TASK STOPPED BY USER: {task_id[:8]}")
         return False
 
-    # --- TÍNH NĂNG 1: TEXT TO VIDEO BATCH (SEQUENTIAL RENDERING & SAVE AI IMAGE) ---
+    def wait_and_download_image_only_task(self, base_url: str, task_id: str, save_filename: str) -> bool:
+        """Monitor tiến trình sinh ảnh AI từ POST /generate-image và tải file .png về máy."""
+        status_url = f"{base_url}/status/{task_id}"
+        image_url = f"{base_url}/image/{task_id}"
+        out_dir = Path(self.output_dir_var.get().strip())
+        out_dir.mkdir(parents=True, exist_ok=True)
+        dest_path = out_dir / save_filename
+
+        self.after(0, lambda: self.active_task_id_var.set(task_id[:12] + "..."))
+        self.status_log(f"▶️ BẮT ĐẦU MONITOR TASK ÁNH: {task_id}")
+
+        while not self.stop_requested:
+            try:
+                res = requests.get(status_url, timeout=10)
+                if res.status_code == 200:
+                    data = res.json()
+                    status = data.get("status")
+                    progress = data.get("progress", 0.0)
+                    detail = data.get("detail", "")
+
+                    log_msg = f"🌐 GET /status/{task_id[:8]} -> 200 OK | Status: {status} ({progress:.1f}%) | {detail}"
+                    self.after(0, lambda m=log_msg: self.status_log(m))
+
+                    self.after(0, lambda s=status: self.active_task_status_var.set(s))
+                    self.after(0, lambda p=progress: self.active_task_progress_var.set(f"{p:.1f} %"))
+
+                    self.after(0, lambda p=progress: self.progress_var.set(p))
+                    self.after(0, lambda d=detail: self.update_status(d))
+
+                    if status == "completed":
+                        self.status_log(f"🎉 GENERATE IMAGE COMPLETED: {task_id[:8]} | Bắt đầu tải ảnh .png...")
+
+                        img_res = requests.get(image_url, timeout=30)
+                        if img_res.status_code == 200:
+                            with open(dest_path, "wb") as f:
+                                f.write(img_res.content)
+                            self.status_log(f"🖼️ ĐÃ LƯU ÁNH THÀNH CÔNG: {save_filename}")
+                            with self.counter_lock:
+                                self.success_count += 1
+                            self.after(0, self.update_stats_label)
+                            return True
+                        else:
+                            self.status_log(f"❌ ERROR DOWNLOAD IMAGE: HTTP {img_res.status_code}")
+                            with self.counter_lock:
+                                self.failed_count += 1
+                            self.after(0, self.update_stats_label)
+                            return False
+                    elif status == "failed":
+                        err_msg = data.get('error')
+                        self.status_log(f"❌ TASK FAILED: {task_id[:8]} | {err_msg}")
+                        with self.counter_lock:
+                            self.failed_count += 1
+                        self.after(0, self.update_stats_label)
+                        return False
+
+                time.sleep(2.0)
+            except Exception as e:
+                self.status_log(f"⚠️ RETRY POLLING ({task_id[:8]}): {e}")
+                time.sleep(3.0)
+
+        self.status_log(f"⏹️ TASK STOPPED BY USER: {task_id[:8]}")
+        return False
+
+    # --- TÍNH NĂNG 1A: TEXT TO VIDEO BATCH (SEQUENTIAL RENDERING & SAVE AI IMAGE) ---
     def start_text_batch(self):
         raw_text = self.txt_prompts.get("1.0", "end").strip()
         prompts = [line.strip() for line in raw_text.splitlines() if line.strip()]
@@ -760,6 +837,74 @@ class ProfessionalVideoStudioApp(tk.Tk):
                     self.after(0, self.update_stats_label)
 
             self.after(0, lambda: self.status_log("🎉 BATCH FINISHED: Hoàn tất tất cả Text Prompts."))
+            self.after(0, lambda: self.update_status("Hoàn tất!"))
+            self.after(0, lambda: self.progress_var.set(100.0))
+            self.after(0, lambda: self.set_buttons_state(False))
+            self.is_processing = False
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    # --- TÍNH NĂNG 1B: CHỈ RENDER ÁNH PROMPTS (CALL POST /generate-image) ---
+    def start_image_only_text_batch(self):
+        raw_text = self.txt_prompts.get("1.0", "end").strip()
+        prompts = [line.strip() for line in raw_text.splitlines() if line.strip()]
+
+        if not prompts:
+            messagebox.showwarning("Cảnh báo", "Vui lòng nhập ít nhất 1 text prompt!")
+            return
+
+        self.is_processing = True
+        self.stop_requested = False
+        self.total_tasks = len(prompts)
+        self.success_count = 0
+        self.failed_count = 0
+        self.update_stats_label()
+
+        self.set_buttons_state(True)
+
+        base_url = self.get_api_base()
+        width = int(self.spn_txt_width.get())
+        height = int(self.spn_txt_height.get())
+
+        self.status_log(f"🎨 Bắt đầu Batch {len(prompts)} Prompts (Chế độ CHỈ RENDER ÁNH)...")
+
+        def worker():
+            total = len(prompts)
+            for idx, prompt in enumerate(prompts, start=1):
+                if self.stop_requested:
+                    break
+
+                self.status_log(f"\n--- [{idx}/{total}] Prompt: '{prompt[:35]}...' | {width}x{height} (Chỉ Render Ảnh) ---")
+
+                payload = {
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_inference_steps": 25,
+                }
+
+                try:
+                    self.status_log(f"📤 POST /generate-image | Prompt: '{prompt[:20]}...'")
+                    res = requests.post(f"{base_url}/generate-image", json=payload, timeout=15)
+                    if res.status_code == 202:
+                        task_id = res.json().get("task_id")
+                        self.status_log(f"✅ POST 202 Accepted | Task ID: {task_id}")
+                        safe_title = "".join(c if c.isalnum() else "_" for c in prompt[:20]).strip("_")
+                        save_filename = f"image_{idx:03d}_{safe_title}.png"
+
+                        self.wait_and_download_image_only_task(base_url, task_id, save_filename)
+                    else:
+                        self.status_log(f"❌ POST FAILED: HTTP {res.status_code}")
+                        with self.counter_lock:
+                            self.failed_count += 1
+                        self.after(0, self.update_stats_label)
+                except Exception as e:
+                    self.status_log(f"❌ REQ EXCEPTION: {e}")
+                    with self.counter_lock:
+                        self.failed_count += 1
+                    self.after(0, self.update_stats_label)
+
+            self.after(0, lambda: self.status_log("🎉 BATCH FINISHED: Hoàn tất tất cả sinh Ảnh AI."))
             self.after(0, lambda: self.update_status("Hoàn tất!"))
             self.after(0, lambda: self.progress_var.set(100.0))
             self.after(0, lambda: self.set_buttons_state(False))
