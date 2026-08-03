@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
 ===============================================================================
-🎬 AI IMAGE & TEXT TO VIDEO BATCH STUDIO v4.0 (Multi-threading & Save AI Image)
+🎬 AI IMAGE & TEXT TO VIDEO BATCH STUDIO v4.1
 ===============================================================================
 Ứng dụng Client GUI chuyên nghiệp kết nối API Image-to-Video Server.
 
-Tính năng mới v4.0:
-- Hỗ trợ Chạy Đa Luồng Song Song (Multi-threading): Tùy chọn 1 đến 4 luồng (Mặc định 2 luồng, tối đa 4 luồng).
-- Checkbox "🖼️ Lưu Ảnh AI Sinh Ra (.png)" trong tab Text to Video: Tải ảnh gốc từ API /image/{task_id} về thư mục lưu.
-- 2 Tab tiêu đề chuẩn: "Text to video" và "Image to video".
+Tính năng mới v4.1:
+- Tab 1 ("Text to video"): Loại bỏ tùy chọn luồng (chạy tuần tự chuẩn xác), giữ nguyên Checkbox "🖼️ Tải Kèm Ảnh AI Gốc (.png)".
+- Tab 2 ("Image to video"): Đặt MẶC ĐỊNH 4 LUỒNG song song (Tối đa 4 luồng).
 - Mặc định: Frame = 360, FPS = 20 (Độ phân giải 1080 x 720 HD, Random Hiệu Ứng 3D).
 - Bảng Monitor bên phải (Right Panel) hiển thị Real-time Log các lượt gọi GET /status/{task_id}.
 - Mặc định mở ở chế độ Full Screen maximized.
@@ -76,7 +75,7 @@ RESOLUTION_PRESETS = {
 class ProfessionalVideoStudioApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("AI Image & Text To Video Batch Studio v4.0 (Multi-threading Studio)")
+        self.title("AI Image & Text To Video Batch Studio v4.1 (Full Screen)")
         
         # Đặt kích thước cơ sở & Phóng to Toàn màn hình (Full Screen Maximized)
         self.geometry("1360x860")
@@ -210,12 +209,12 @@ class ProfessionalVideoStudioApp(tk.Tk):
         header_panel = ttk.Frame(self, style="Card.TFrame", padding=(16, 12))
         header_panel.pack(fill="x", padx=14, pady=(12, 6))
 
-        lbl_logo = ttk.Label(header_panel, text="🎬 AI IMAGE & TEXT TO VIDEO STUDIO v4.0", style="Title.TLabel")
+        lbl_logo = ttk.Label(header_panel, text="🎬 AI IMAGE & TEXT TO VIDEO STUDIO v4.1", style="Title.TLabel")
         lbl_logo.pack(anchor="w")
 
         lbl_desc = ttk.Label(
             header_panel,
-            text="Hệ thống Render Batch Video 3D | Hỗ trợ Chạy Đa Luồng Song Song (Max 4 Luồng) & Tải Kèm Ảnh AI Gốc",
+            text="Hệ thống Render Batch Video 3D | Tab Image to Video Mặc Định 4 Luồng Song Song & Tải Kèm Ảnh AI Gốc",
             style="Sub.TLabel",
         )
         lbl_desc.pack(anchor="w", pady=(2, 0))
@@ -366,7 +365,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
         )
         self.txt_prompts.insert("1.0", sample_prompts)
 
-        # CẤU HÌNH THAM SỐ TAB 1 (FRAME=360, FPS=20, LUỒNG=2, TẢI KÈM ÁNH CHECKBOX)
+        # CẤU HÌNH THAM SỐ TAB 1 (FRAME=360, FPS=20, ĐÃ BỎ PHẦN SỐ LUỒNG, CÓ CHECKBOX TẢI ÁNH)
         opts_card = ttk.Frame(self.tab_text, style="Card.TFrame", padding=10)
         opts_card.pack(fill="x", pady=6)
 
@@ -379,12 +378,12 @@ class ProfessionalVideoStudioApp(tk.Tk):
         cmb_preset.bind("<<ComboboxSelected>>", self.on_resolution_preset_changed)
 
         ttk.Label(opts_card, text="Width:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=2, padx=4, pady=4)
-        self.spn_txt_width = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=5)
+        self.spn_txt_width = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
         self.spn_txt_width.set(1080)
         self.spn_txt_width.grid(row=0, column=3, padx=4, pady=4)
 
         ttk.Label(opts_card, text="Height:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=4, padx=4, pady=4)
-        self.spn_txt_height = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=5)
+        self.spn_txt_height = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
         self.spn_txt_height.set(720)
         self.spn_txt_height.grid(row=0, column=5, padx=4, pady=4)
 
@@ -412,14 +411,9 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.spn_txt_fps.set(20)  # MẶC ĐỊNH 20 FPS
         self.spn_txt_fps.grid(row=1, column=5, padx=4, pady=4)
 
-        # Hàng 3: SỐ LUỒNG (WORKERS) & CHECKBOX TẢI KÈM ÁNH GỐC (.PNG)
-        ttk.Label(opts_card, text="⚡ Số Luồng (Workers):", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", padx=4, pady=4)
-        self.spn_txt_threads = ttk.Spinbox(opts_card, from_=1, to=4, increment=1, width=5)
-        self.spn_txt_threads.set(2)  # MẶC ĐỊNH 2 LUỒNG, MAX 4 LUỒNG
-        self.spn_txt_threads.grid(row=2, column=1, sticky="w", padx=4, pady=4)
-
+        # Hàng 3: CHECKBOX TẢI KÈM ÁNH AI GỐC (.PNG) (Đã bỏ tùy chọn số luồng ở Tab 1)
         chk_save_img = ttk.Checkbutton(opts_card, text="🖼️ Tải Kèm Ảnh AI Gốc (.png)", variable=self.chk_txt_save_img_var, style="TCheckbutton")
-        chk_save_img.grid(row=2, column=2, columnspan=4, sticky="w", padx=8, pady=4)
+        chk_save_img.grid(row=2, column=0, columnspan=6, sticky="w", padx=4, pady=4)
 
         btn_action_frame = ttk.Frame(self.tab_text)
         btn_action_frame.pack(fill="x", pady=8)
@@ -496,10 +490,10 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.spn_img_fps.set(20)  # MẶC ĐỊNH 20 FPS
         self.spn_img_fps.grid(row=0, column=5, padx=4, pady=4)
 
-        # Hàng 2: SỐ LUỒNG (WORKERS) CHO TAB IMAGE TO VIDEO
+        # Hàng 2: SỐ LUỒNG (WORKERS) MẶC ĐỊNH 4 LUỒNG CHO TAB IMAGE TO VIDEO
         ttk.Label(opts_card, text="⚡ Số Luồng (Workers):", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", padx=4, pady=4)
         self.spn_img_threads = ttk.Spinbox(opts_card, from_=1, to=4, increment=1, width=5)
-        self.spn_img_threads.set(2)  # MẶC ĐỊNH 2 LUỒNG, MAX 4 LUỒNG
+        self.spn_img_threads.set(4)  # MẶC ĐỊNH 4 LUỒNG CHO IMAGE TO VIDEO
         self.spn_img_threads.grid(row=1, column=1, sticky="w", padx=4, pady=4)
 
         btn_action_frame = ttk.Frame(self.tab_image)
@@ -693,7 +687,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.status_log(f"⏹️ TASK STOPPED BY USER: {task_id[:8]}")
         return False
 
-    # --- TÍNH NĂNG 1: TEXT TO VIDEO BATCH (MULTI-THREADING & SAVE AI IMAGE) ---
+    # --- TÍNH NĂNG 1: TEXT TO VIDEO BATCH (SEQUENTIAL RENDERING & SAVE AI IMAGE) ---
     def start_text_batch(self):
         raw_text = self.txt_prompts.get("1.0", "end").strip()
         prompts = [line.strip() for line in raw_text.splitlines() if line.strip()]
@@ -716,61 +710,54 @@ class ProfessionalVideoStudioApp(tk.Tk):
         height = int(self.spn_txt_height.get())
         num_frames = int(self.spn_txt_frames.get())
         fps = int(self.spn_txt_fps.get())
-        max_workers = max(1, min(4, int(self.spn_txt_threads.get())))
         save_image = self.chk_txt_save_img_var.get()
         selected_motion_label = self.txt_motion_var.get()
 
-        self.status_log(f"🚀 Bắt đầu Batch {len(prompts)} Prompts (Text to Video Mode) - Chạy {max_workers} Luồng Song Song...")
+        self.status_log(f"🚀 Bắt đầu Batch {len(prompts)} Prompts (Text to Video Mode)...")
 
-        def process_single_prompt(idx_and_prompt):
-            idx, prompt = idx_and_prompt
-            if self.stop_requested:
-                return
+        def worker():
+            total = len(prompts)
+            for idx, prompt in enumerate(prompts, start=1):
+                if self.stop_requested:
+                    break
 
-            effect = self.get_selected_motion_code(selected_motion_label)
-            self.status_log(f"\n--- [Luồng {threading.current_thread().name}] [{idx}/{len(prompts)}] Prompt: '{prompt[:30]}...' | {width}x{height} | Hiệu ứng: {effect} ---")
+                effect = self.get_selected_motion_code(selected_motion_label)
+                self.status_log(f"\n--- [{idx}/{total}] Prompt: '{prompt[:35]}...' | {width}x{height} | Hiệu ứng: {effect} ---")
 
-            payload = {
-                "prompt": prompt,
-                "width": width,
-                "height": height,
-                "num_frames": num_frames,
-                "fps": fps,
-                "motion_type": effect,
-            }
+                payload = {
+                    "prompt": prompt,
+                    "width": width,
+                    "height": height,
+                    "num_frames": num_frames,
+                    "fps": fps,
+                    "motion_type": effect,
+                }
 
-            try:
-                self.status_log(f"📤 POST /generate | Prompt: '{prompt[:20]}...'")
-                res = requests.post(f"{base_url}/generate", json=payload, timeout=15)
-                if res.status_code == 202:
-                    task_id = res.json().get("task_id")
-                    self.status_log(f"✅ POST 202 Accepted | Task ID: {task_id}")
-                    safe_title = "".join(c if c.isalnum() else "_" for c in prompt[:20]).strip("_")
-                    save_filename = f"text_{idx:03d}_{safe_title}_{effect}.mp4"
+                try:
+                    self.status_log(f"📤 POST /generate | Prompt: '{prompt[:20]}...'")
+                    res = requests.post(f"{base_url}/generate", json=payload, timeout=15)
+                    if res.status_code == 202:
+                        task_id = res.json().get("task_id")
+                        self.status_log(f"✅ POST 202 Accepted | Task ID: {task_id}")
+                        safe_title = "".join(c if c.isalnum() else "_" for c in prompt[:20]).strip("_")
+                        save_filename = f"text_{idx:03d}_{safe_title}_{effect}.mp4"
 
-                    success = self.wait_and_download_task(base_url, task_id, save_filename)
+                        success = self.wait_and_download_task(base_url, task_id, save_filename)
 
-                    # Tải kèm ảnh AI gốc nếu chọn Checkbox
-                    if success and save_image:
-                        img_filename = f"text_{idx:03d}_{safe_title}.png"
-                        self.download_image_task(base_url, task_id, img_filename)
-                else:
-                    self.status_log(f"❌ POST FAILED: HTTP {res.status_code}")
+                        # Tải kèm ảnh AI gốc nếu chọn Checkbox
+                        if success and save_image:
+                            img_filename = f"text_{idx:03d}_{safe_title}.png"
+                            self.download_image_task(base_url, task_id, img_filename)
+                    else:
+                        self.status_log(f"❌ POST FAILED: HTTP {res.status_code}")
+                        with self.counter_lock:
+                            self.failed_count += 1
+                        self.after(0, self.update_stats_label)
+                except Exception as e:
+                    self.status_log(f"❌ REQ EXCEPTION: {e}")
                     with self.counter_lock:
                         self.failed_count += 1
                     self.after(0, self.update_stats_label)
-            except Exception as e:
-                self.status_log(f"❌ REQ EXCEPTION: {e}")
-                with self.counter_lock:
-                    self.failed_count += 1
-                self.after(0, self.update_stats_label)
-
-        def master_worker():
-            with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="Worker") as executor:
-                items = list(enumerate(prompts, start=1))
-                futures = [executor.submit(process_single_prompt, item) for item in items]
-                for future in futures:
-                    future.result()
 
             self.after(0, lambda: self.status_log("🎉 BATCH FINISHED: Hoàn tất tất cả Text Prompts."))
             self.after(0, lambda: self.update_status("Hoàn tất!"))
@@ -778,9 +765,9 @@ class ProfessionalVideoStudioApp(tk.Tk):
             self.after(0, lambda: self.set_buttons_state(False))
             self.is_processing = False
 
-        threading.Thread(target=master_worker, daemon=True).start()
+        threading.Thread(target=worker, daemon=True).start()
 
-    # --- TÍNH NĂNG 2: IMAGE TO VIDEO BATCH (MULTI-THREADING) ---
+    # --- TÍNH NĂNG 2: IMAGE TO VIDEO BATCH (MULTI-THREADING 4 LUỒNG MẶC ĐỊNH) ---
     def start_image_batch(self):
         folder_path = self.img_folder_var.get().strip()
         p = Path(folder_path)
