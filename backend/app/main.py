@@ -23,6 +23,7 @@ from .database import (
 )
 from .model_runtime import (
     dispatch_generation_task,
+    dispatch_image_only_task,
     dispatch_image_to_video_task,
     runtime_state,
 )
@@ -72,6 +73,14 @@ class ImageToVideoRequest(BaseModel):
     prompt: Optional[str] = Field("Base64 Image Video Task", description="Mô tả hoặc tiêu đề cho tác vụ")
 
 
+class GenerateImageOnlyRequest(BaseModel):
+    prompt: str = Field(..., description="Văn bản mô tả ảnh cần sinh AI (Chỉ tạo ảnh, không dựng video)", example="A hyperrealistic cybernetic tiger in a futuristic forest")
+    negative_prompt: str = Field("", description="Các chi tiết không mong muốn trong ảnh", example="blurry, low quality")
+    width: int = Field(1080, ge=256, le=2048, description="Chiều rộng ảnh")
+    height: int = Field(720, ge=256, le=2048, description="Chiều cao ảnh")
+    num_inference_steps: int = Field(25, ge=1, le=100, description="Số bước khuếch tán sinh ảnh Stable Diffusion")
+
+
 @app.get("/")
 def index():
     return {
@@ -79,6 +88,7 @@ def index():
         "version": "1.0.0",
         "endpoints": {
             "generate": "POST /generate",
+            "generate_image": "POST /generate-image",
             "generate_from_image": "POST /generate-from-image",
             "status": "GET /status/{task_id}",
             "download": "GET /download/{task_id}",
@@ -98,6 +108,40 @@ def health():
 @app.get("/runtime")
 def get_runtime():
     return runtime_state()
+
+
+@app.post("/generate-image", status_code=202)
+def generate_image_only(req: GenerateImageOnlyRequest):
+    """API nhận Text Prompt và chỉ khởi chạy tiến trình sinh ảnh AI (không tạo video)."""
+    if not req.prompt.strip():
+        raise HTTPException(status_code=400, detail="Vui lòng cung cấp nội dung text prompt hợp lệ.")
+
+    task_id = str(uuid.uuid4())
+    create_task(
+        task_id=task_id,
+        prompt=req.prompt.strip(),
+        negative_prompt=req.negative_prompt.strip(),
+        width=req.width,
+        height=req.height,
+        num_inference_steps=req.num_inference_steps,
+    )
+
+    dispatch_image_only_task(
+        task_id=task_id,
+        prompt=req.prompt.strip(),
+        negative_prompt=req.negative_prompt.strip(),
+        width=req.width,
+        height=req.height,
+        num_inference_steps=req.num_inference_steps,
+    )
+
+    return {
+        "task_id": task_id,
+        "status": "queued",
+        "detail": "Tác vụ sinh ảnh đã được tiếp nhận và đang được xử lý...",
+        "status_url": f"/status/{task_id}",
+        "image_url": f"/image/{task_id}",
+    }
 
 
 @app.post("/generate", status_code=202)

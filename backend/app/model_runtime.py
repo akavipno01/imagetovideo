@@ -338,3 +338,90 @@ def dispatch_image_to_video_task(
         fps,
     )
 
+
+def process_image_only_task(
+    task_id: str,
+    prompt: str,
+    negative_prompt: str = "",
+    width: int = 1080,
+    height: int = 720,
+    num_inference_steps: int = 25,
+):
+    """Tiến trình sinh ảnh AI từ văn bản (chỉ tạo ảnh .png, không dựng video)."""
+    try:
+        update_task_progress(
+            task_id,
+            status="generating_image",
+            progress=10.0,
+            detail=f"Đang sinh ảnh AI từ prompt: '{prompt[:30]}...' (0%)",
+        )
+
+        pipe = get_pipeline()
+        image_filename = f"{task_id}.png"
+        image_path = IMAGES_DIR / image_filename
+
+        if pipe is not None:
+            def step_callback(step: int, timestep: int, latents: Any):
+                prog = 10.0 + (step / max(1, num_inference_steps)) * 85.0
+                update_task_progress(
+                    task_id,
+                    status="generating_image",
+                    progress=round(prog, 1),
+                    detail=f"Đang sinh ảnh AI... Bước {step}/{num_inference_steps}",
+                )
+
+            res = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt if negative_prompt else None,
+                width=width,
+                height=height,
+                num_inference_steps=num_inference_steps,
+                callback=step_callback,
+                callback_steps=max(1, num_inference_steps // 5),
+            )
+            image = res.images[0]
+        else:
+            time.sleep(1.0)
+            image = generate_fallback_image(prompt, width, height)
+
+        image.save(image_path)
+
+        update_task_progress(
+            task_id,
+            status="completed",
+            progress=100.0,
+            detail="Hoàn tất sinh ảnh AI thành công!",
+            image_filename=image_filename,
+            completed=True,
+        )
+    except Exception as exc:
+        print(f"Error processing image-only task {task_id}: {exc}")
+        update_task_progress(
+            task_id,
+            status="failed",
+            progress=0.0,
+            detail=f"Lỗi: {str(exc)}",
+            error=str(exc),
+            completed=True,
+        )
+
+
+def dispatch_image_only_task(
+    task_id: str,
+    prompt: str,
+    negative_prompt: str = "",
+    width: int = 1080,
+    height: int = 720,
+    num_inference_steps: int = 25,
+) -> None:
+    _executor.submit(
+        process_image_only_task,
+        task_id,
+        prompt,
+        negative_prompt,
+        width,
+        height,
+        num_inference_steps,
+    )
+
+

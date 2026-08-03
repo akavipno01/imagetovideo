@@ -76,7 +76,33 @@ Server sẽ chạy mặc định tại: `http://127.0.0.1:3930`
 
 ---
 
-### 2. Gửi yêu cầu sinh Video từ Ảnh Base64
+### 2. Gửi yêu cầu CHỈ sinh Ảnh AI (Prompt to Image only)
+- **Endpoint**: `POST /generate-image`
+- **Content-Type**: `application/json`
+- **Body Request**:
+```json
+{
+  "prompt": "A hyperrealistic cybernetic tiger in a futuristic forest",
+  "negative_prompt": "blurry, low quality",
+  "width": 1080,
+  "height": 720,
+  "num_inference_steps": 25
+}
+```
+- **Response**:
+```json
+{
+  "task_id": "b1a2c3d4-5e6f-7890-abcd-ef1234567890",
+  "status": "queued",
+  "detail": "Tác vụ sinh ảnh đã được tiếp nhận và đang được xử lý...",
+  "status_url": "/status/b1a2c3d4-5e6f-7890-abcd-ef1234567890",
+  "image_url": "/image/b1a2c3d4-5e6f-7890-abcd-ef1234567890"
+}
+```
+
+---
+
+### 3. Gửi yêu cầu sinh Video từ Ảnh Base64
 - **Endpoint**: `POST /generate-from-image`
 - **Content-Type**: `application/json`
 - **Body Request**:
