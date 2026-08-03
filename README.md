@@ -1,15 +1,17 @@
-# Text to Image & Video Generator (Text-to-Video API)
+# Text to Image & Base64 Image to Video Generator (Text/Image-to-Video API)
 
-Hệ thống API và Google Colab Notebook cho phép chuyển đổi từ **Văn bản (Text Prompt)** sang **Ảnh (PNG)** và **Video chuyển động 3D / Parallax (MP4)**.
+Hệ thống API và Google Colab Notebook cho phép chuyển đổi từ **Văn bản (Text Prompt)** hoặc **Ảnh Base64 (PNG/JPG/WEBP)** sang **Video chuyển động 3D / Parallax (MP4)**.
 
-Mô hình kiến trúc được thiết kế theo cấu trúc dự án `voicecolab`, tích hợp các thuật toán sinh ảnh từ `Stable Diffusion / Diffusers` và công nghệ dựng hiệu ứng camera chuyển động 3D từ `3d-photo-inpainting`.
+Mô hình kiến trúc được thiết kế theo cấu trúc dự án `voicecolab`, tích hợp các thuật toán sinh ảnh từ `Stable Diffusion / Diffusers` và công nghệ dựng hiệu ứng camera chuyển động 3D từ `3d-photo-inpainting` / `OpenCV`.
 
 ---
 
 ## 🚀 Tính năng nổi bật
 
-- 📝 **Text to Image**: Tự động chuyển văn bản tiếng Anh/tiếng Việt thành bức ảnh phong cảnh, nhân vật hoặc nghệ thuật bằng mô hình Diffusion.
-- 🎬 **Image to 3D Video**: Tự động dựng video MP4 chuyển động camera 3D chuyên nghiệp (Zoom In, Zoom Out, Pan Left/Right, 3D Parallax, Circle Orbit).
+- 📝 **Text to Video**: Tự động chuyển văn bản (Text Prompt) thành ảnh AI và render thành video chuyển động 3D.
+- 🖼️ **Base64 Image to Video**: Cho phép gửi trực tiếp dữ liệu ảnh dạng chuỗi **Base64** để tạo video chuyển động 3D lập tức.
+- 🎬 **Hiệu ứng Camera 3D Đa dạng**: Hỗ trợ 6 kiểu chuyển động camera (`zoom_in`, `zoom_out`, `pan_left`, `pan_right`, `3d_parallax`, `circle_orbit`).
+- ⏱️ **Độ phân giải & Thời lượng cao**: Hỗ trợ kích thước khung hình lên tới **2048px** và số lượng khung hình lên tới **600 frames** (tối đa ~40 giây video).
 - ⚡ **Hàng chờ không đồng bộ (Async Queue)**: Nhận yêu cầu ngay lập tức, trả về `task_id` và cập nhật phần trăm tiến độ `%` chi tiết.
 - ☁️ **Google Colab GPU & Cloudflare Tunnel**: Khởi chạy dễ dàng trên GPU miễn phí của Google Colab và mở cổng HTTPS công khai không cần mở port mạng cá nhân.
 - 💾 **SQLite Database**: Lưu trữ lịch sử tất cả các tác vụ sinh video, thời gian tạo, đường dẫn file và trạng thái.
@@ -30,7 +32,7 @@ Mô hình kiến trúc được thiết kế theo cấu trúc dự án `voicecol
 
 ### 1. Cài đặt môi trường
 ```bash
-cd d:/Thang/imagetovideo/backend
+cd backend
 pip install -r requirements.txt
 ```
 
@@ -52,11 +54,11 @@ Server sẽ chạy mặc định tại: `http://127.0.0.1:3930`
 {
   "prompt": "A majestic glowing dragon flying over misty mountains at sunset, 4k cinematic fantasy",
   "negative_prompt": "blurry, low quality, distortion",
-  "width": 512,
-  "height": 512,
+  "width": 1024,
+  "height": 720,
   "num_inference_steps": 20,
   "motion_type": "zoom_in",
-  "num_frames": 30,
+  "num_frames": 225,
   "fps": 15
 }
 ```
@@ -72,7 +74,36 @@ Server sẽ chạy mặc định tại: `http://127.0.0.1:3930`
 }
 ```
 
-### 2. Kiểm tra tiến độ tác vụ
+---
+
+### 2. Gửi yêu cầu sinh Video từ Ảnh Base64
+- **Endpoint**: `POST /generate-from-image`
+- **Content-Type**: `application/json`
+- **Body Request**:
+```json
+{
+  "image_base64": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "motion_type": "3d_parallax",
+  "num_frames": 225,
+  "fps": 15,
+  "prompt": "Tác vụ video từ ảnh Base64"
+}
+```
+- **Response**:
+```json
+{
+  "task_id": "8f3b41d2-9c12-4011-a889-112233445566",
+  "status": "queued",
+  "detail": "Đã nhận ảnh Base64 và khởi chạy tiến trình dựng video 3D...",
+  "status_url": "/status/8f3b41d2-9c12-4011-a889-112233445566",
+  "download_url": "/download/8f3b41d2-9c12-4011-a889-112233445566",
+  "image_url": "/image/8f3b41d2-9c12-4011-a889-112233445566"
+}
+```
+
+---
+
+### 3. Kiểm tra tiến độ tác vụ
 - **Endpoint**: `GET /status/{task_id}`
 - **Response**:
 ```json
@@ -81,24 +112,32 @@ Server sẽ chạy mặc định tại: `http://127.0.0.1:3930`
   "prompt": "A majestic glowing dragon...",
   "status": "generating_video",
   "progress": 75.0,
-  "detail": "Đang render khung hình video 15/30...",
+  "detail": "Đang render khung hình video 168/225...",
   "image_filename": "c9a7d2e3-4f51-4123-88ab-9912bc05f321.png",
   "video_filename": null
 }
 ```
 
-### 3. Tải Video MP4 Kết Quả
+---
+
+### 4. Tải Video MP4 Kết Quả
 - **Endpoint**: `GET /download/{task_id}`
 - Trả về trực tiếp file `video_c9a7d2e3.mp4` để tải về hoặc xem trên trình duyệt.
 
-### 4. Xem/Tải Ảnh Trung Gian
-- **Endpoint**: `GET /image/{task_id}`
-- Trả về file ảnh `.png` vừa được tạo từ Text Prompt.
+---
 
-### 5. Danh Sách Lịch Sử Tác Vụ
+### 5. Xem/Tải Ảnh Trung Gian
+- **Endpoint**: `GET /image/{task_id}`
+- Trả về file ảnh `.png` được tạo từ Text Prompt hoặc ảnh tải lên.
+
+---
+
+### 6. Danh Sách Lịch Sử Tác Vụ
 - **Endpoint**: `GET /tasks`
 
-### 6. Kiểm Tra Trạng Thái GPU / Server
+---
+
+### 7. Kiểm Tra Trạng Thái GPU / Server
 - **Endpoint**: `GET /health` hoặc `GET /runtime`
 
 ---
@@ -111,5 +150,15 @@ Server sẽ chạy mặc định tại: `http://127.0.0.1:3930`
 | `zoom_out` | Mắt camera thu nhỏ dần ra xa |
 | `pan_left` | Camera lia mượt sang bên trái |
 | `pan_right` | Camera lia mượt sang bên phải |
-| `3d_parallax` | Tạo hiệu ứng chiều sâu 3D lắc góc camera theo bản đồ độ sâu |
-| `circle_orbit` | Camera lượn vòng tròn 3D nghệ thuật |
+| `3d_parallax` | Tạo hiệu ứng chiều sâu 3D lắc góc camera theo bản đồ độ sâu (Depth Map) |
+| `circle_orbit` | Camera lượn vòng tròn 3D nghệ thuật xung quanh tâm |
+
+---
+
+## 📐 Công thức tính thời lượng Video
+
+$$\text{Thời lượng video (giây)} = \frac{\text{num\_frames}}{\text{fps}}$$
+
+- **Video 15 giây (FPS 15)**: Set `"fps": 15` và `"num_frames": 225` ($15 \times 15 = 225$).
+- **Video 15 giây (FPS 24 - Chuẩn điện ảnh)**: Set `"fps": 24` và `"num_frames": 360` ($24 \times 15 = 360$).
+- **Video 30 giây (FPS 15)**: Set `"fps": 15` và `"num_frames": 450` ($15 \times 30 = 450$).
