@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import base64
+import io
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
 
+from PIL import Image
 from fastapi import FastAPI, HTTPException, BackgroundTasks, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
