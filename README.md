@@ -162,3 +162,20 @@ $$\text{Thời lượng video (giây)} = \frac{\text{num\_frames}}{\text{fps}}$$
 - **Video 15 giây (FPS 15)**: Set `"fps": 15` và `"num_frames": 225` ($15 \times 15 = 225$).
 - **Video 15 giây (FPS 24 - Chuẩn điện ảnh)**: Set `"fps": 24` và `"num_frames": 360` ($24 \times 15 = 360$).
 - **Video 30 giây (FPS 15)**: Set `"fps": 15` và `"num_frames": 450` ($15 \times 30 = 450$).
+
+---
+
+## 🖥️ Ứng dụng Desktop GUI Client (`client_app.py`)
+
+Dự án cung cấp sẵn một phần mềm giao diện đồ họa Python (Desktop GUI Client) hỗ trợ tự động hóa render hàng loạt:
+
+### Cách khởi chạy ứng dụng GUI:
+```bash
+python client_app.py
+```
+
+### Các tính năng trên giao diện:
+1. **Ô điền URL Server**: Nhập địa chỉ Cloudflare Tunnel (vd: `https://tobacco-went-harper-que.trycloudflare.com`) kèm nút **Kiểm Tra Kết Nối**.
+2. **Tính Năng 1 - Render Danh Sách Text Prompts**: Nhập danh sách văn bản (mỗi prompt 1 dòng). Chương trình sẽ tự động ngẫu nhiên hóa các hiệu ứng camera 3D (`zoom_in`, `zoom_out`, `pan_left`, `pan_right`, `3d_parallax`, `circle_orbit`), theo dõi tiến độ và tự động tải video MP4 về máy.
+3. **Tính Năng 2 - Render Thư Mục Ảnh (Base64 Mode)**: Chọn một thư mục chứa các file ảnh (`.png`, `.jpg`, `.jpeg`, `.webp`), chuyển đổi ảnh thành chuỗi Base64 và gửi lên API render video hiệu ứng ngẫu nhiên.
+
