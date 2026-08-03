@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
@@ -18,7 +18,11 @@ from .database import (
     initialize_database,
     list_tasks,
 )
-from .model_runtime import dispatch_generation_task, runtime_state
+from .model_runtime import (
+    dispatch_generation_task,
+    dispatch_image_to_video_task,
+    runtime_state,
+)
 
 
 @asynccontextmanager
@@ -57,6 +61,14 @@ class GenerateRequest(BaseModel):
     fps: int = Field(15, ge=5, le=60, description="Tốc độ khung hình (khung hình / giây)")
 
 
+class ImageToVideoRequest(BaseModel):
+    image_base64: str = Field(..., description="Dữ liệu ảnh dạng chuỗi Base64 (hỗ trợ cả dạng raw base64 hoặc data:image/png;base64,...)", example="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
+    motion_type: str = Field("zoom_in", description="Hiệu ứng chuyển động camera 3D: zoom_in, zoom_out, pan_left, pan_right, 3d_parallax, circle_orbit")
+    num_frames: int = Field(30, ge=10, le=600, description="Tổng số khung hình cho video")
+    fps: int = Field(15, ge=5, le=60, description="Tốc độ khung hình (khung hình / giây)")
+    prompt: Optional[str] = Field("Base64 Image Video Task", description="Mô tả hoặc tiêu đề cho tác vụ")
+
+
 @app.get("/")
 def index():
     return {
@@ -64,6 +76,7 @@ def index():
         "version": "1.0.0",
         "endpoints": {
             "generate": "POST /generate",
+            "generate_from_image": "POST /generate-from-image",
             "status": "GET /status/{task_id}",
             "download": "GET /download/{task_id}",
             "image": "GET /image/{task_id}",
@@ -119,6 +132,60 @@ def generate_text_to_video(req: GenerateRequest):
         "task_id": task_id,
         "status": "queued",
         "detail": "Tác vụ đã được tiếp nhận và đang được xử lý...",
+        "status_url": f"/status/{task_id}",
+        "download_url": f"/download/{task_id}",
+        "image_url": f"/image/{task_id}",
+    }
+
+
+@app.post("/generate-from-image", status_code=202)
+def generate_video_from_base64_image(req: ImageToVideoRequest):
+    """API nhận dữ liệu ảnh dạng chuỗi Base64 và khởi chạy tiến trình tạo video hiệu ứng 3D."""
+    if not req.image_base64.strip():
+        raise HTTPException(status_code=400, detail="Vui lòng cung cấp dữ liệu chuỗi Base64 ảnh.")
+
+    base64_str = req.image_base64.strip()
+    if "," in base64_str:
+        base64_str = base64_str.split(",", 1)[1]
+
+    try:
+        image_bytes = base64.b64decode(base64_str)
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        width, height = img.size
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Dữ liệu ảnh Base64 không hợp lệ: {str(exc)}")
+
+    task_id = str(uuid.uuid4())
+    image_filename = f"{task_id}.png"
+    image_path = IMAGES_DIR / image_filename
+    img.save(image_path, format="PNG")
+
+    prompt_text = req.prompt.strip() if req.prompt else "Uploaded Base64 Image"
+
+    task = create_task(
+        task_id=task_id,
+        prompt=prompt_text,
+        negative_prompt="",
+        width=width,
+        height=height,
+        num_inference_steps=0,
+        motion_type=req.motion_type,
+        num_frames=req.num_frames,
+        fps=req.fps,
+    )
+
+    dispatch_image_to_video_task(
+        task_id=task_id,
+        image_filename=image_filename,
+        motion_type=req.motion_type,
+        num_frames=req.num_frames,
+        fps=req.fps,
+    )
+
+    return {
+        "task_id": task_id,
+        "status": "queued",
+        "detail": "Đã nhận ảnh Base64 và khởi chạy tiến trình dựng video 3D...",
         "status_url": f"/status/{task_id}",
         "download_url": f"/download/{task_id}",
         "image_url": f"/image/{task_id}",

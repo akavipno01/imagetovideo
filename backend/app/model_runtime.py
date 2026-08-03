@@ -259,3 +259,82 @@ def dispatch_generation_task(
         num_frames,
         fps,
     )
+
+
+def process_image_to_video_task(
+    task_id: str,
+    image_filename: str,
+    motion_type: str = "zoom_in",
+    num_frames: int = 30,
+    fps: int = 15,
+) -> None:
+    """Tiến trình chạy ngầm nhận file ảnh tải lên và dựng video hiệu ứng 3D."""
+    try:
+        image_path = IMAGES_DIR / image_filename
+        if not image_path.is_file():
+            raise FileNotFoundError(f"Không tìm thấy file ảnh tải lên tại {image_path}")
+
+        update_task_progress(
+            task_id,
+            status="generating_video",
+            progress=10.0,
+            detail="Đã nhận ảnh tải lên! Bắt đầu tạo video chuyển động...",
+            image_filename=image_filename,
+        )
+
+        video_filename = f"{task_id}.mp4"
+        video_path = VIDEOS_DIR / video_filename
+
+        def video_progress_cb(p: float, msg: str):
+            update_task_progress(
+                task_id,
+                status="generating_video",
+                progress=p,
+                detail=msg,
+            )
+
+        render_motion_video(
+            image_path=image_path,
+            output_video_path=video_path,
+            motion_type=motion_type,
+            num_frames=num_frames,
+            fps=fps,
+            progress_callback=video_progress_cb,
+        )
+
+        update_task_progress(
+            task_id,
+            status="completed",
+            progress=100.0,
+            detail="Hoàn tất tạo video từ ảnh tải lên!",
+            video_filename=video_filename,
+            completed=True,
+        )
+    except Exception as exc:
+        print(f"Error processing image to video task {task_id}: {exc}")
+        update_task_progress(
+            task_id,
+            status="failed",
+            progress=0.0,
+            detail=f"Lỗi: {str(exc)}",
+            error=str(exc),
+            completed=True,
+        )
+
+
+def dispatch_image_to_video_task(
+    task_id: str,
+    image_filename: str,
+    motion_type: str = "zoom_in",
+    num_frames: int = 30,
+    fps: int = 15,
+) -> None:
+    _executor.submit(
+        process_image_to_video_task,
+        task_id,
+        image_filename,
+        motion_type,
+        num_frames,
+        fps,
+    )
+
