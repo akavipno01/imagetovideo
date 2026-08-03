@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
 ===============================================================================
-🎬 AI IMAGE & TEXT TO VIDEO BATCH STUDIO v2.5
+🎬 AI IMAGE & TEXT TO VIDEO BATCH STUDIO v3.0 (Full Screen & High-Contrast Comboboxes)
 ===============================================================================
 Ứng dụng Client GUI chuyên nghiệp kết nối API Image-to-Video Server.
 
-Tính năng nổi bật:
+Tính năng mới v3.0:
+- Mặc định ở chế độ Phóng To Toàn Màn Hình (Full Screen / Maximized).
+- Combobox chọn Khung Ảnh và Hiệu Ứng 3D được thiết kế chữ in đậm, màu trắng sáng tương phản cao cực kỳ rõ nét khi chọn xong.
 - Bảng Monitor bên phải (Right Panel) hiển thị Real-time Log các lượt gọi GET /status/{task_id}.
 - Mặc định độ phân giải chuẩn: 1080 x 720 (Hỗ trợ 1080p Full HD & Tùy chỉnh).
 - Kết nối tự động đến API Server (Colab Cloudflare Tunnel / Localhost).
 - Tính năng 1: Render danh sách Text Prompts với hiệu ứng 3D ngẫu nhiên/tùy chọn.
 - Tính năng 2: Quét thư mục ảnh, chuyển đổi Base64 và render video 3D hàng loạt.
-- Đã được tối ưu hóa giao diện Dark Studio cao cấp, High-DPI Windows và Multi-threading.
 ===============================================================================
 """
 
@@ -75,9 +76,15 @@ RESOLUTION_PRESETS = {
 class ProfessionalVideoStudioApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("AI Image & Text To Video Batch Studio v2.5 (Real-time Status Monitor)")
-        self.geometry("1280x820")
+        self.title("AI Image & Text To Video Batch Studio v3.0 (Full Screen Studio)")
+        
+        # Đặt kích thước cơ sở & Phóng to Toàn màn hình (Full Screen Maximized)
+        self.geometry("1360x860")
         self.minsize(1100, 700)
+        try:
+            self.state("zoomed")  # Mặc định Full Screen trên Windows
+        except Exception:
+            pass
 
         # Cấu hình Bảng màu Dark Studio (Catppuccin / Modern Slate Palette)
         self.colors = {
@@ -85,7 +92,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
             "card_bg": "#1e1e2e",       # Khung Card
             "card_border": "#313244",   # Viền khung
             "input_bg": "#181825",     # Nền ô nhập dữ liệu
-            "text_main": "#cdd6f4",    # Chữ sáng chính
+            "text_main": "#ffffff",    # Chữ trắng sáng (Tương phản cao)
             "text_sub": "#a6adc8",     # Chữ phụ
             "accent": "#89b4fa",       # Xanh lam Accent
             "accent_hover": "#b4befe", # Hover Xanh lam
@@ -122,6 +129,13 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.style = ttk.Style(self)
         self.style.theme_use("clam")
 
+        # Cấu hình danh sách popup Combobox rõ chữ, tương phản cao
+        self.option_add("*TCombobox*Listbox.font", ("Segoe UI", 10, "bold"))
+        self.option_add("*TCombobox*Listbox.background", "#181825")
+        self.option_add("*TCombobox*Listbox.foreground", "#ffffff")
+        self.option_add("*TCombobox*Listbox.selectBackground", "#89b4fa")
+        self.option_add("*TCombobox*Listbox.selectForeground", "#11111b")
+
         self.style.configure(".", background=self.colors["bg_dark"], foreground=self.colors["text_main"], font=("Segoe UI", 10))
         self.style.configure("TFrame", background=self.colors["bg_dark"])
         self.style.configure("Card.TFrame", background=self.colors["card_bg"], relief="flat", borderwidth=1)
@@ -130,120 +144,154 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.style.configure("TLabel", background=self.colors["bg_dark"], foreground=self.colors["text_main"])
         self.style.configure("Card.TLabel", background=self.colors["card_bg"], foreground=self.colors["text_main"])
         self.style.configure("Sub.TLabel", background=self.colors["card_bg"], foreground=self.colors["text_sub"], font=("Segoe UI", 9))
-        self.style.configure("Title.TLabel", background=self.colors["card_bg"], font=("Segoe UI", 13, "bold"), foreground=self.colors["accent"])
-        self.style.configure("Section.TLabel", background=self.colors["card_bg"], font=("Segoe UI", 10, "bold"), foreground=self.colors["accent"])
+        self.style.configure("Title.TLabel", background=self.colors["card_bg"], font=("Segoe UI", 14, "bold"), foreground=self.colors["accent"])
+        self.style.configure("Section.TLabel", background=self.colors["card_bg"], font=("Segoe UI", 11, "bold"), foreground=self.colors["accent"])
 
-        self.style.configure("TButton", font=("Segoe UI", 9, "bold"), padding=6, relief="flat", background=self.colors["card_border"], foreground=self.colors["text_main"])
+        self.style.configure("TButton", font=("Segoe UI", 10, "bold"), padding=6, relief="flat", background=self.colors["card_border"], foreground=self.colors["text_main"])
         self.style.map("TButton", background=[("active", self.colors["accent"]), ("disabled", "#2a2b3d")], foreground=[("active", "#11111b")])
 
-        self.style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"), padding=8, background=self.colors["accent"], foreground="#11111b")
+        self.style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"), padding=9, background=self.colors["accent"], foreground="#11111b")
         self.style.map("Accent.TButton", background=[("active", self.colors["accent_hover"]), ("disabled", "#313244")], foreground=[("disabled", "#6c7086")])
 
-        self.style.configure("Danger.TButton", font=("Segoe UI", 10, "bold"), padding=8, background=self.colors["danger"], foreground="#11111b")
+        self.style.configure("Danger.TButton", font=("Segoe UI", 10, "bold"), padding=9, background=self.colors["danger"], foreground="#11111b")
         self.style.map("Danger.TButton", background=[("active", "#f5e0dc")])
 
         self.style.configure("TNotebook", background=self.colors["bg_dark"], borderwidth=0)
-        self.style.configure("TNotebook.Tab", font=("Segoe UI", 9, "bold"), padding=[14, 6], background=self.colors["bg_dark"], foreground=self.colors["text_sub"])
+        self.style.configure("TNotebook.Tab", font=("Segoe UI", 10, "bold"), padding=[16, 8], background=self.colors["bg_dark"], foreground=self.colors["text_sub"])
         self.style.map("TNotebook.Tab", background=[("selected", self.colors["card_bg"])], foreground=[("selected", self.colors["accent"])])
 
-        self.style.configure("TEntry", fieldbackground=self.colors["input_bg"], foreground=self.colors["text_main"], borderwidth=1)
-        self.style.configure("TCombobox", fieldbackground=self.colors["input_bg"], background=self.colors["card_bg"], foreground=self.colors["text_main"])
-        self.style.configure("TSpinbox", fieldbackground=self.colors["input_bg"], background=self.colors["card_bg"], foreground=self.colors["text_main"])
+        self.style.configure("TEntry", fieldbackground=self.colors["input_bg"], foreground="#ffffff", font=("Segoe UI", 10, "bold"), borderwidth=1)
+
+        # Style Combobox TƯƠNG PHẢN CAO, BẬT RÕ CHỮ
+        self.style.configure(
+            "TCombobox",
+            fieldbackground="#181825",
+            background="#313244",
+            foreground="#ffffff",
+            selectbackground="#181825",
+            selectforeground="#ffffff",
+            font=("Segoe UI", 10, "bold"),
+            arrowcolor="#89b4fa",
+            padding=4,
+        )
+        self.style.map(
+            "TCombobox",
+            fieldbackground=[("readonly", "#181825"), ("active", "#313244"), ("disabled", "#2a2b3d")],
+            foreground=[("readonly", "#ffffff"), ("active", "#ffffff"), ("disabled", "#6c7086")],
+            selectbackground=[("readonly", "#181825"), ("focus", "#181825")],
+            selectforeground=[("readonly", "#ffffff"), ("focus", "#ffffff")],
+        )
+
+        # Style Spinbox RÕ CHỮ
+        self.style.configure(
+            "TSpinbox",
+            fieldbackground="#181825",
+            background="#313244",
+            foreground="#ffffff",
+            font=("Segoe UI", 10, "bold"),
+            arrowcolor="#89b4fa",
+            padding=4,
+        )
+        self.style.map(
+            "TSpinbox",
+            fieldbackground=[("active", "#313244")],
+            foreground=[("active", "#ffffff")],
+        )
 
     def create_widgets(self):
         # Header Logo & Subtitle
-        header_panel = ttk.Frame(self, style="Card.TFrame", padding=(14, 10))
-        header_panel.pack(fill="x", padx=12, pady=(10, 4))
+        header_panel = ttk.Frame(self, style="Card.TFrame", padding=(16, 12))
+        header_panel.pack(fill="x", padx=14, pady=(12, 6))
 
-        lbl_logo = ttk.Label(header_panel, text="🎬 AI IMAGE & TEXT TO VIDEO STUDIO v2.5", style="Title.TLabel")
+        lbl_logo = ttk.Label(header_panel, text="🎬 AI IMAGE & TEXT TO VIDEO STUDIO v3.0 (FULL SCREEN MODE)", style="Title.TLabel")
         lbl_logo.pack(anchor="w")
 
         lbl_desc = ttk.Label(
             header_panel,
-            text="Hệ thống Render Batch Video 3D | Tích hợp Bảng Monitor Polling /status Real-time bên phải",
+            text="Hệ thống Render Batch Video 3D | Giao diện Full Screen & Khung Combobox chữ trắng sáng tương phản cao",
             style="Sub.TLabel",
         )
         lbl_desc.pack(anchor="w", pady=(2, 0))
 
         # 1. TOP SERVER CONTROL CARD
-        server_card = ttk.Frame(self, style="Card.TFrame", padding=12)
-        server_card.pack(fill="x", padx=12, pady=4)
+        server_card = ttk.Frame(self, style="Card.TFrame", padding=14)
+        server_card.pack(fill="x", padx=14, pady=6)
 
         # Hàng 1: URL Server & Status
-        lbl_api = ttk.Label(server_card, text="🌐 URL Server API:", style="Card.TLabel", font=("Segoe UI", 9, "bold"))
-        lbl_api.grid(row=0, column=0, sticky="w", padx=4, pady=3)
+        lbl_api = ttk.Label(server_card, text="🌐 URL Server API:", style="Card.TLabel", font=("Segoe UI", 10, "bold"))
+        lbl_api.grid(row=0, column=0, sticky="w", padx=4, pady=4)
 
-        entry_api = ttk.Entry(server_card, textvariable=self.api_url_var, font=("Segoe UI", 9), width=48)
-        entry_api.grid(row=0, column=1, sticky="ew", padx=6, pady=3)
+        entry_api = ttk.Entry(server_card, textvariable=self.api_url_var, font=("Segoe UI", 10, "bold"), width=54)
+        entry_api.grid(row=0, column=1, sticky="ew", padx=6, pady=4)
 
         btn_test = ttk.Button(server_card, text="🔌 Kiểm Tra Kết Nối", command=self.test_connection)
-        btn_test.grid(row=0, column=2, padx=4, pady=3)
+        btn_test.grid(row=0, column=2, padx=4, pady=4)
 
         self.lbl_connection_badge = ttk.Label(
-            server_card, textvariable=self.connection_status_var, style="Card.TLabel", font=("Segoe UI", 9, "bold")
+            server_card, textvariable=self.connection_status_var, style="Card.TLabel", font=("Segoe UI", 10, "bold")
         )
-        self.lbl_connection_badge.grid(row=0, column=3, padx=10, pady=3, sticky="e")
+        self.lbl_connection_badge.grid(row=0, column=3, padx=12, pady=4, sticky="e")
 
         # Hàng 2: Thư mục đầu ra (Output Directory)
-        lbl_out = ttk.Label(server_card, text="📁 Thư Mục Lưu Video:", style="Card.TLabel", font=("Segoe UI", 9, "bold"))
-        lbl_out.grid(row=1, column=0, sticky="w", padx=4, pady=3)
+        lbl_out = ttk.Label(server_card, text="📁 Thư Mục Lưu Video:", style="Card.TLabel", font=("Segoe UI", 10, "bold"))
+        lbl_out.grid(row=1, column=0, sticky="w", padx=4, pady=4)
 
-        entry_out = ttk.Entry(server_card, textvariable=self.output_dir_var, font=("Segoe UI", 9), width=48)
-        entry_out.grid(row=1, column=1, sticky="ew", padx=6, pady=3)
+        entry_out = ttk.Entry(server_card, textvariable=self.output_dir_var, font=("Segoe UI", 10, "bold"), width=54)
+        entry_out.grid(row=1, column=1, sticky="ew", padx=6, pady=4)
 
         btn_browse_out = ttk.Button(server_card, text="Chọn Thư Mục...", command=self.browse_output_dir)
-        btn_browse_out.grid(row=1, column=2, padx=4, pady=3)
+        btn_browse_out.grid(row=1, column=2, padx=4, pady=4)
 
         server_card.columnconfigure(1, weight=1)
 
         # 2. KHU VỰC CHÍNH SPLIT: BÊN TRÁI (TABS & LOG CHUNG) + BÊN PHẢI (LOG STATUS MONITOR REALTIME)
         main_split_frame = ttk.Frame(self)
-        main_split_frame.pack(fill="both", expand=True, padx=12, pady=4)
+        main_split_frame.pack(fill="both", expand=True, padx=14, pady=6)
 
         # --- BÊN TRÁI (LEFT PANEL - 65% WIDTH) ---
         left_panel = ttk.Frame(main_split_frame)
         left_panel.pack(side="left", fill="both", expand=True, padx=(0, 6))
 
         self.notebook = ttk.Notebook(left_panel)
-        self.notebook.pack(fill="both", expand=True, pady=(0, 4))
+        self.notebook.pack(fill="both", expand=True, pady=(0, 6))
 
-        self.tab_text = ttk.Frame(self.notebook, padding=10)
-        self.tab_image = ttk.Frame(self.notebook, padding=10)
+        self.tab_text = ttk.Frame(self.notebook, padding=12)
+        self.tab_image = ttk.Frame(self.notebook, padding=12)
 
-        self.notebook.add(self.tab_text, text="📝 Tính Năng 1: Text Prompt List -> Video")
-        self.notebook.add(self.tab_image, text="🖼️ Tính Năng 2: Thư Mục Ảnh Base64 -> Video")
+        self.notebook.add(self.tab_text, text="📝 Tính Năng 1: Text Prompt List -> Video (1080x720 Mặc định)")
+        self.notebook.add(self.tab_image, text="🖼️ Tính Năng 2: Thư Mục Ảnh Base64 -> Video (1080x720 Mặc định)")
 
         self.setup_tab_text()
         self.setup_tab_image()
 
         # Tiến trình & General Console Log ở phía dưới bên trái
-        bottom_left_card = ttk.Frame(left_panel, style="Card.TFrame", padding=10)
-        bottom_left_card.pack(fill="x", pady=(4, 0))
+        bottom_left_card = ttk.Frame(left_panel, style="Card.TFrame", padding=12)
+        bottom_left_card.pack(fill="x", pady=(6, 0))
 
         prog_top_frame = ttk.Frame(bottom_left_card, style="Card.TFrame")
-        prog_top_frame.pack(fill="x", pady=(0, 2))
+        prog_top_frame.pack(fill="x", pady=(0, 4))
 
-        self.lbl_status = ttk.Label(prog_top_frame, text="Trạng thái: Sẵn sàng làm việc", style="Card.TLabel", font=("Segoe UI", 9, "bold"))
+        self.lbl_status = ttk.Label(prog_top_frame, text="Trạng thái: Sẵn sàng làm việc", style="Card.TLabel", font=("Segoe UI", 10, "bold"))
         self.lbl_status.pack(side="left")
 
-        self.lbl_stats = ttk.Label(prog_top_frame, text="Hoàn tất: 0/0", style="Sub.TLabel")
+        self.lbl_stats = ttk.Label(prog_top_frame, text="Hoàn tất: 0/0", style="Sub.TLabel", font=("Segoe UI", 9, "bold"))
         self.lbl_stats.pack(side="right")
 
         self.progress_var = tk.DoubleVar()
         self.progress_bar = ttk.Progressbar(bottom_left_card, variable=self.progress_var, maximum=100)
-        self.progress_bar.pack(fill="x", pady=2)
+        self.progress_bar.pack(fill="x", pady=4)
 
         # General Console Log
         gen_log_header = ttk.Frame(bottom_left_card, style="Card.TFrame")
         gen_log_header.pack(fill="x", pady=(4, 2))
-        ttk.Label(gen_log_header, text="💻 Log Tiến Trình General:", style="Card.TLabel", font=("Segoe UI", 8, "bold")).pack(side="left")
+        ttk.Label(gen_log_header, text="💻 Nhật Ký Tiến Trình Hệ Thống (Console Log):", style="Card.TLabel", font=("Segoe UI", 9, "bold")).pack(side="left")
         ttk.Button(gen_log_header, text="Xóa Log", command=self.clear_general_logs).pack(side="right")
 
         gen_log_frame = ttk.Frame(bottom_left_card)
         gen_log_frame.pack(fill="both", expand=True, pady=2)
 
         self.log_text = tk.Text(
-            gen_log_frame, height=4, bg=self.colors["input_bg"], fg=self.colors["text_main"], font=("Consolas", 8), relief="flat", wrap="word"
+            gen_log_frame, height=5, bg=self.colors["input_bg"], fg=self.colors["text_main"], font=("Consolas", 9), relief="flat", wrap="word"
         )
         scrollbar_gen = ttk.Scrollbar(gen_log_frame, command=self.log_text.yview)
         self.log_text.configure(yscrollcommand=scrollbar_gen.set)
@@ -251,36 +299,36 @@ class ProfessionalVideoStudioApp(tk.Tk):
         scrollbar_gen.pack(side="right", fill="y")
 
         # --- BÊN PHẢI (RIGHT PANEL - DEDICATED STATUS MONITOR LOG 35% WIDTH) ---
-        right_panel = ttk.Frame(main_split_frame, style="Card.TFrame", padding=12, width=380)
+        right_panel = ttk.Frame(main_split_frame, style="Card.TFrame", padding=14, width=420)
         right_panel.pack(side="right", fill="both", expand=False, padx=(6, 0))
 
         # Tiêu đề Bảng Status Monitor
         lbl_status_title = ttk.Label(right_panel, text="📡 BẢNG MONITOR STATUS REAL-TIME", style="Section.TLabel")
         lbl_status_title.pack(anchor="w", pady=(0, 4))
 
-        lbl_status_sub = ttk.Label(right_panel, text="Theo dõi lượt gọi GET /status/{task_id} theo từng giây", style="Sub.TLabel")
-        lbl_status_sub.pack(anchor="w", pady=(0, 6))
+        lbl_status_sub = ttk.Label(right_panel, text="Theo dõi liên tục lượt gọi GET /status/{task_id} từng giây", style="Sub.TLabel")
+        lbl_status_sub.pack(anchor="w", pady=(0, 8))
 
         # Card hiển thị thông tin Task Active hiện tại
-        active_card = ttk.Frame(right_panel, style="Card.TFrame", padding=8, relief="solid")
-        active_card.pack(fill="x", pady=(0, 8))
+        active_card = ttk.Frame(right_panel, style="Card.TFrame", padding=10, relief="solid")
+        active_card.pack(fill="x", pady=(0, 10))
 
-        ttk.Label(active_card, text="Task ID Active:", style="Card.TLabel", font=("Segoe UI", 8, "bold")).grid(row=0, column=0, sticky="w")
-        lbl_act_id = ttk.Label(active_card, textvariable=self.active_task_id_var, style="Card.TLabel", font=("Segoe UI", 8), foreground=self.colors["accent"])
-        lbl_act_id.grid(row=0, column=1, sticky="w", padx=4)
+        ttk.Label(active_card, text="Task ID Active:", style="Card.TLabel", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="w")
+        lbl_act_id = ttk.Label(active_card, textvariable=self.active_task_id_var, style="Card.TLabel", font=("Segoe UI", 9, "bold"), foreground=self.colors["accent"])
+        lbl_act_id.grid(row=0, column=1, sticky="w", padx=6)
 
-        ttk.Label(active_card, text="Trạng thái API:", style="Card.TLabel", font=("Segoe UI", 8, "bold")).grid(row=1, column=0, sticky="w")
-        lbl_act_st = ttk.Label(active_card, textvariable=self.active_task_status_var, style="Card.TLabel", font=("Segoe UI", 8, "bold"), foreground=self.colors["warning"])
-        lbl_act_st.grid(row=1, column=1, sticky="w", padx=4)
+        ttk.Label(active_card, text="Trạng thái API:", style="Card.TLabel", font=("Segoe UI", 9, "bold")).grid(row=1, column=0, sticky="w")
+        lbl_act_st = ttk.Label(active_card, textvariable=self.active_task_status_var, style="Card.TLabel", font=("Segoe UI", 9, "bold"), foreground=self.colors["warning"])
+        lbl_act_st.grid(row=1, column=1, sticky="w", padx=6)
 
-        ttk.Label(active_card, text="Tiến độ:", style="Card.TLabel", font=("Segoe UI", 8, "bold")).grid(row=2, column=0, sticky="w")
-        lbl_act_pr = ttk.Label(active_card, textvariable=self.active_task_progress_var, style="Card.TLabel", font=("Segoe UI", 8, "bold"), foreground=self.colors["success"])
-        lbl_act_pr.grid(row=2, column=1, sticky="w", padx=4)
+        ttk.Label(active_card, text="Tiến độ:", style="Card.TLabel", font=("Segoe UI", 9, "bold")).grid(row=2, column=0, sticky="w")
+        lbl_act_pr = ttk.Label(active_card, textvariable=self.active_task_progress_var, style="Card.TLabel", font=("Segoe UI", 9, "bold"), foreground=self.colors["success"])
+        lbl_act_pr.grid(row=2, column=1, sticky="w", padx=6)
 
         # Header Khung Log Status
         status_log_header = ttk.Frame(right_panel, style="Card.TFrame")
         status_log_header.pack(fill="x", pady=(2, 4))
-        ttk.Label(status_log_header, text="🌐 Lịch Sử Polling /status Log:", style="Card.TLabel", font=("Segoe UI", 8, "bold")).pack(side="left")
+        ttk.Label(status_log_header, text="🌐 Lịch Sử Polling /status Log:", style="Card.TLabel", font=("Segoe UI", 9, "bold")).pack(side="left")
         btn_clear_st = ttk.Button(status_log_header, text="Xóa Status Log", command=self.clear_status_logs)
         btn_clear_st.pack(side="right")
 
@@ -290,11 +338,11 @@ class ProfessionalVideoStudioApp(tk.Tk):
 
         self.status_log_text = tk.Text(
             st_log_frame,
-            height=20,
-            width=36,
+            height=22,
+            width=40,
             bg=self.colors["status_log_bg"],
             fg=self.colors["status_log_fg"],
-            font=("Consolas", 8),
+            font=("Consolas", 9, "bold"),
             relief="flat",
             wrap="word",
         )
@@ -306,13 +354,13 @@ class ProfessionalVideoStudioApp(tk.Tk):
     # ================= TAB 1: TEXT PROMPTS SETUP =================
     def setup_tab_text(self):
         lbl = ttk.Label(self.tab_text, text="Nhập danh sách Text Prompts (Mỗi prompt 1 dòng):", style="Section.TLabel")
-        lbl.pack(anchor="w", pady=(0, 4))
+        lbl.pack(anchor="w", pady=(0, 6))
 
         txt_frame = ttk.Frame(self.tab_text)
-        txt_frame.pack(fill="both", expand=True, pady=(0, 6))
+        txt_frame.pack(fill="both", expand=True, pady=(0, 8))
 
         self.txt_prompts = tk.Text(
-            txt_frame, height=6, bg=self.colors["input_bg"], fg=self.colors["text_main"], font=("Segoe UI", 9), insertbackground="white", relief="flat"
+            txt_frame, height=7, bg=self.colors["input_bg"], fg=self.colors["text_main"], font=("Segoe UI", 10), insertbackground="white", relief="flat"
         )
         txt_scroll = ttk.Scrollbar(txt_frame, command=self.txt_prompts.yview)
         self.txt_prompts.configure(yscrollcommand=txt_scroll.set)
@@ -327,28 +375,28 @@ class ProfessionalVideoStudioApp(tk.Tk):
         )
         self.txt_prompts.insert("1.0", sample_prompts)
 
-        # CẤU HÌNH THAM SỐ
-        opts_card = ttk.Frame(self.tab_text, style="Card.TFrame", padding=8)
-        opts_card.pack(fill="x", pady=4)
+        # CẤU HÌNH THAM SỐ (Bao gồm COMBOBOX TƯƠNG PHẢN CAO RÕ CHỮ)
+        opts_card = ttk.Frame(self.tab_text, style="Card.TFrame", padding=10)
+        opts_card.pack(fill="x", pady=6)
 
-        ttk.Label(opts_card, text="📐 Khung Ảnh:", style="Card.TLabel", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="w", padx=2, pady=2)
+        ttk.Label(opts_card, text="📐 Mẫu Khung Ảnh:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", padx=4, pady=4)
 
         self.preset_var = tk.StringVar(value="1080 x 720 (HD - Mặc định)")
-        cmb_preset = ttk.Combobox(opts_card, textvariable=self.preset_var, values=list(RESOLUTION_PRESETS.keys()), state="readonly", width=24)
-        cmb_preset.grid(row=0, column=1, padx=2, pady=2)
+        cmb_preset = ttk.Combobox(opts_card, textvariable=self.preset_var, values=list(RESOLUTION_PRESETS.keys()), state="readonly", width=28)
+        cmb_preset.grid(row=0, column=1, padx=4, pady=4)
         cmb_preset.bind("<<ComboboxSelected>>", self.on_resolution_preset_changed)
 
-        ttk.Label(opts_card, text="Width:").grid(row=0, column=2, padx=2, pady=2)
-        self.spn_txt_width = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=5)
+        ttk.Label(opts_card, text="Width:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=2, padx=4, pady=4)
+        self.spn_txt_width = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
         self.spn_txt_width.set(1080)
-        self.spn_txt_width.grid(row=0, column=3, padx=2, pady=2)
+        self.spn_txt_width.grid(row=0, column=3, padx=4, pady=4)
 
-        ttk.Label(opts_card, text="Height:").grid(row=0, column=4, padx=2, pady=2)
-        self.spn_txt_height = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=5)
+        ttk.Label(opts_card, text="Height:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=4, padx=4, pady=4)
+        self.spn_txt_height = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
         self.spn_txt_height.set(720)
-        self.spn_txt_height.grid(row=0, column=5, padx=2, pady=2)
+        self.spn_txt_height.grid(row=0, column=5, padx=4, pady=4)
 
-        ttk.Label(opts_card, text="🎬 Hiệu Ứng 3D:", style="Card.TLabel", font=("Segoe UI", 9, "bold")).grid(row=1, column=0, sticky="w", padx=2, pady=2)
+        ttk.Label(opts_card, text="🎬 Hiệu Ứng 3D:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", padx=4, pady=4)
 
         self.txt_motion_var = tk.StringVar(value="random")
         cmb_txt_motion = ttk.Combobox(
@@ -356,28 +404,28 @@ class ProfessionalVideoStudioApp(tk.Tk):
             textvariable=self.txt_motion_var,
             values=[v for k, v in MOTION_LABELS.items()],
             state="readonly",
-            width=24,
+            width=28,
         )
-        cmb_txt_motion.grid(row=1, column=1, padx=2, pady=2)
+        cmb_txt_motion.grid(row=1, column=1, padx=4, pady=4)
         cmb_txt_motion.set(MOTION_LABELS["random"])
 
-        ttk.Label(opts_card, text="Frames:").grid(row=1, column=2, padx=2, pady=2)
-        self.spn_txt_frames = ttk.Spinbox(opts_card, from_=10, to=600, increment=15, width=5)
+        ttk.Label(opts_card, text="Frames:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=2, padx=4, pady=4)
+        self.spn_txt_frames = ttk.Spinbox(opts_card, from_=10, to=600, increment=15, width=6)
         self.spn_txt_frames.set(225)
-        self.spn_txt_frames.grid(row=1, column=3, padx=2, pady=2)
+        self.spn_txt_frames.grid(row=1, column=3, padx=4, pady=4)
 
-        ttk.Label(opts_card, text="FPS:").grid(row=1, column=4, padx=2, pady=2)
-        self.spn_txt_fps = ttk.Spinbox(opts_card, from_=5, to=60, increment=1, width=5)
+        ttk.Label(opts_card, text="FPS:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=4, padx=4, pady=4)
+        self.spn_txt_fps = ttk.Spinbox(opts_card, from_=5, to=60, increment=1, width=6)
         self.spn_txt_fps.set(15)
-        self.spn_txt_fps.grid(row=1, column=5, padx=2, pady=2)
+        self.spn_txt_fps.grid(row=1, column=5, padx=4, pady=4)
 
         btn_action_frame = ttk.Frame(self.tab_text)
-        btn_action_frame.pack(fill="x", pady=6)
+        btn_action_frame.pack(fill="x", pady=8)
 
         self.btn_run_text = ttk.Button(
             btn_action_frame, text="🚀 KHỞI CHẠY RENDER DANH SÁCH TEXT PROMPTS", style="Accent.TButton", command=self.start_text_batch
         )
-        self.btn_run_text.pack(side="left", padx=(0, 6))
+        self.btn_run_text.pack(side="left", padx=(0, 8))
 
         self.btn_stop_text = ttk.Button(btn_action_frame, text="⏹️ DỪNG TIẾN TRÌNH", style="Danger.TButton", command=self.request_stop, state="disabled")
         self.btn_stop_text.pack(side="left")
@@ -392,26 +440,26 @@ class ProfessionalVideoStudioApp(tk.Tk):
     # ================= TAB 2: IMAGE FOLDER SETUP =================
     def setup_tab_image(self):
         lbl = ttk.Label(self.tab_image, text="Chọn Thư Mục Chứa Ảnh để Render Video (Base64 Mode):", style="Section.TLabel")
-        lbl.pack(anchor="w", pady=(0, 4))
+        lbl.pack(anchor="w", pady=(0, 6))
 
-        folder_card = ttk.Frame(self.tab_image, style="Card.TFrame", padding=8)
-        folder_card.pack(fill="x", pady=(0, 6))
+        folder_card = ttk.Frame(self.tab_image, style="Card.TFrame", padding=10)
+        folder_card.pack(fill="x", pady=(0, 8))
 
         self.img_folder_var = tk.StringVar()
-        entry_img_dir = ttk.Entry(folder_card, textvariable=self.img_folder_var, font=("Segoe UI", 9))
-        entry_img_dir.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        entry_img_dir = ttk.Entry(folder_card, textvariable=self.img_folder_var, font=("Segoe UI", 10, "bold"))
+        entry_img_dir.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
         btn_browse_img = ttk.Button(folder_card, text="📁 Chọn Thư Mục Ảnh...", command=self.browse_image_folder)
         btn_browse_img.pack(side="right")
 
         lbl_files = ttk.Label(self.tab_image, text="Danh sách các file ảnh hợp lệ:")
-        lbl_files.pack(anchor="w", pady=(2, 2))
+        lbl_files.pack(anchor="w", pady=(4, 2))
 
         list_frame = ttk.Frame(self.tab_image)
-        list_frame.pack(fill="both", expand=True, pady=(0, 6))
+        list_frame.pack(fill="both", expand=True, pady=(0, 8))
 
         self.lst_images = tk.Listbox(
-            list_frame, bg=self.colors["input_bg"], fg=self.colors["text_main"], font=("Consolas", 8), relief="flat", selectbackground="#45475a"
+            list_frame, bg=self.colors["input_bg"], fg=self.colors["text_main"], font=("Consolas", 9), relief="flat", selectbackground="#45475a"
         )
         lst_scroll = ttk.Scrollbar(list_frame, command=self.lst_images.yview)
         self.lst_images.configure(yscrollcommand=lst_scroll.set)
@@ -419,10 +467,10 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.lst_images.pack(side="left", fill="both", expand=True)
         lst_scroll.pack(side="right", fill="y")
 
-        opts_card = ttk.Frame(self.tab_image, style="Card.TFrame", padding=8)
-        opts_card.pack(fill="x", pady=4)
+        opts_card = ttk.Frame(self.tab_image, style="Card.TFrame", padding=10)
+        opts_card.pack(fill="x", pady=6)
 
-        ttk.Label(opts_card, text="🎬 Hiệu Ứng 3D:", style="Card.TLabel", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="w", padx=2, pady=2)
+        ttk.Label(opts_card, text="🎬 Hiệu Ứng 3D:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", padx=4, pady=4)
 
         self.img_motion_var = tk.StringVar(value="random")
         cmb_img_motion = ttk.Combobox(
@@ -430,28 +478,28 @@ class ProfessionalVideoStudioApp(tk.Tk):
             textvariable=self.img_motion_var,
             values=[v for k, v in MOTION_LABELS.items()],
             state="readonly",
-            width=24,
+            width=28,
         )
-        cmb_img_motion.grid(row=0, column=1, padx=2, pady=2)
+        cmb_img_motion.grid(row=0, column=1, padx=4, pady=4)
         cmb_img_motion.set(MOTION_LABELS["random"])
 
-        ttk.Label(opts_card, text="Frames:").grid(row=0, column=2, padx=2, pady=2)
-        self.spn_img_frames = ttk.Spinbox(opts_card, from_=10, to=600, increment=15, width=5)
+        ttk.Label(opts_card, text="Frames:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=2, padx=4, pady=4)
+        self.spn_img_frames = ttk.Spinbox(opts_card, from_=10, to=600, increment=15, width=6)
         self.spn_img_frames.set(225)
-        self.spn_img_frames.grid(row=0, column=3, padx=2, pady=2)
+        self.spn_img_frames.grid(row=0, column=3, padx=4, pady=4)
 
-        ttk.Label(opts_card, text="FPS:").grid(row=0, column=4, padx=2, pady=2)
-        self.spn_img_fps = ttk.Spinbox(opts_card, from_=5, to=60, increment=1, width=5)
+        ttk.Label(opts_card, text="FPS:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=4, padx=4, pady=4)
+        self.spn_img_fps = ttk.Spinbox(opts_card, from_=5, to=60, increment=1, width=6)
         self.spn_img_fps.set(15)
-        self.spn_img_fps.grid(row=0, column=5, padx=2, pady=2)
+        self.spn_img_fps.grid(row=0, column=5, padx=4, pady=4)
 
         btn_action_frame = ttk.Frame(self.tab_image)
-        btn_action_frame.pack(fill="x", pady=6)
+        btn_action_frame.pack(fill="x", pady=8)
 
         self.btn_run_img = ttk.Button(
             btn_action_frame, text="🚀 KHỞI CHẠY RENDER TẤT CẢ ÁNH TRONG THƯ MỤC", style="Accent.TButton", command=self.start_image_batch
         )
-        self.btn_run_img.pack(side="left", padx=(0, 6))
+        self.btn_run_img.pack(side="left", padx=(0, 8))
 
         self.btn_stop_img = ttk.Button(btn_action_frame, text="⏹️ DỪNG TIẾN TRÌNH", style="Danger.TButton", command=self.request_stop, state="disabled")
         self.btn_stop_img.pack(side="left")
@@ -464,7 +512,6 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.log_text.see("end")
 
     def status_log(self, message: str):
-        """Ghi log chuyên dụng cho bảng Monitor Status ở bên phải."""
         timestamp = time.strftime("%H:%M:%S")
         formatted = f"[{timestamp}] {message}\n"
         self.status_log_text.insert("end", formatted)
@@ -581,7 +628,6 @@ class ProfessionalVideoStudioApp(tk.Tk):
                     progress = data.get("progress", 0.0)
                     detail = data.get("detail", "")
 
-                    # Ghi log chuyên dụng vào bảng Monitor Status bên phải
                     log_msg = f"🌐 GET /status/{task_id[:8]} -> 200 OK | Status: {status} ({progress:.1f}%) | {detail}"
                     self.after(0, lambda m=log_msg: self.status_log(m))
 
