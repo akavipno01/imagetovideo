@@ -1,22 +1,37 @@
 #!/usr/bin/env python3
 """
-Ứng dụng Client GUI (Tkinter) kết nối với API Image-to-Video Server.
-Tính năng:
-1. Nhập địa chỉ API Server (vd: https://xxx.trycloudflare.com).
-2. Render danh sách Text Prompts (mỗi prompt 1 dòng) với hiệu ứng ngẫu nhiên.
-3. Chọn thư mục chứa Ảnh -> Chuyển thành Base64 -> Render thành Video với hiệu ứng ngẫu nhiên.
-4. Tải file Video MP4 về thư mục xuất (Output Directory).
+===============================================================================
+🎬 AI IMAGE & TEXT TO VIDEO BATCH STUDIO v2.0
+===============================================================================
+Ứng dụng Client GUI chuyên nghiệp kết nối API Image-to-Video Server.
+
+Tính năng nổi bật:
+- Mặc định độ phân giải chuẩn: 1080 x 720 (Hỗ trợ 1080p Full HD & Tùy chỉnh).
+- Kết nối tự động đến API Server (Colab Cloudflare Tunnel / Localhost).
+- Tính năng 1: Render danh sách Text Prompts với hiệu ứng 3D ngẫu nhiên/tùy chọn.
+- Tính năng 2: Quét thư mục ảnh, chuyển đổi Base64 và render video 3D hàng loạt.
+- Đã được tối ưu hóa giao diện Dark Studio cao cấp, High-DPI Windows và Multi-threading.
+===============================================================================
 """
 
 import base64
 import os
 import random
+import sys
 import threading
 import time
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import List, Optional
+
+# Tối ưu hóa độ phân giải cao High-DPI trên Windows
+if sys.platform == "win32":
+    try:
+        import ctypes
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        pass
 
 try:
     import requests
@@ -33,108 +48,199 @@ MOTION_EFFECTS = [
     "circle_orbit",
 ]
 
+MOTION_LABELS = {
+    "random": "🎲 Random Hiệu Ứng (Ngẫu Nhiên)",
+    "zoom_in": "🔍 Zoom In (Phóng To Camera)",
+    "zoom_out": "🔎 Zoom Out (Thu Nhỏ Camera)",
+    "pan_left": "⬅️ Pan Left (Lia Trái)",
+    "pan_right": "➡️ Pan Right (Lia Phải)",
+    "3d_parallax": "✨ 3D Parallax (Nổi Khối Chiều Sâu)",
+    "circle_orbit": "🔄 Circle Orbit (Xoay Vòng Tròn 3D)",
+}
+
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 
+# Danh sách độ phân giải sẵn (Resolution Presets)
+RESOLUTION_PRESETS = {
+    "1080 x 720 (HD - Mặc định)": (1080, 720),
+    "1920 x 1080 (Full HD 1080p)": (1920, 1080),
+    "1080 x 1080 (Square 1:1)": (1080, 1080),
+    "720 x 1280 (Vertical TikTok/Reels)": (720, 1280),
+    "512 x 512 (Standard SD)": (512, 512),
+    "Tùy chỉnh (Custom)": (1080, 720),
+}
 
-class ImageToVideoClientApp(tk.Tk):
+
+class ProfessionalVideoStudioApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("AI Image & Text To Video Batch Client v1.0")
-        self.geometry("960 ...")
-        self.geometry("980x720")
-        self.minsize(850, 600)
+        self.title("AI Image & Text To Video Batch Studio v2.0")
+        self.geometry("1080x780")
+        self.minsize(980, 680)
 
-        # Cấu hình Theme / Styles
-        self.style = ttk.Style(self)
-        self.style.theme_use("clam")
+        # Cấu hình Bảng màu Dark Studio (Catppuccin / Modern Slate Palette)
+        self.colors = {
+            "bg_dark": "#11111b",       # Nền chính tối
+            "card_bg": "#1e1e2e",       # Khung Card
+            "card_border": "#313244",   # Viền khung
+            "input_bg": "#181825",     # Nền ô nhập dữ liệu
+            "text_main": "#cdd6f4",    # Chữ sáng chính
+            "text_sub": "#a6adc8",     # Chữ phụ
+            "accent": "#89b4fa",       # Xanh lam Accent
+            "accent_hover": "#b4befe", # Hover Xanh lam
+            "success": "#a6e3a1",      # Xanh lá thành công
+            "danger": "#f38ba8",       # Đỏ dừng/lỗi
+            "warning": "#fab387",      # Cam cảnh báo
+        }
+
         self.configure_styles()
 
-        # Biến trạng thái
+        # Các biến quản lý dữ liệu giao diện
         self.api_url_var = tk.StringVar(value="https://tobacco-went-harper-que.trycloudflare.com")
         self.output_dir_var = tk.StringVar(value=str(Path.home() / "Downloads" / "AI_Videos"))
+        self.connection_status_var = tk.StringVar(value="⚪ Chưa kết nối")
+
+        # Thống kê tiến trình
+        self.total_tasks = 0
+        self.success_count = 0
+        self.failed_count = 0
+
         self.is_processing = False
         self.stop_requested = False
 
         self.create_widgets()
 
     def configure_styles(self):
-        bg_dark = "#1e1e2e"
-        fg_light = "#cdd6f4"
-        card_bg = "#313244"
-        accent_color = "#89b4fa"
+        self.configure(bg=self.colors["bg_dark"])
+        self.style = ttk.Style(self)
+        self.style.theme_use("clam")
 
-        self.configure(bg=bg_dark)
-        self.style.configure(".", background=bg_dark, foreground=fg_light, font=("Segoe UI", 10))
-        self.style.configure("TFrame", background=bg_dark)
-        self.style.configure("Card.TFrame", background=card_bg, relief="flat")
-        self.style.configure("TLabel", background=bg_dark, foreground=fg_light)
-        self.style.configure("Card.TLabel", background=card_bg, foreground=fg_light)
-        self.style.configure("Header.TLabel", font=("Segoe UI", 12, "bold"), foreground=accent_color)
-        self.style.configure("TButton", font=("Segoe UI", 10, "bold"), padding=6)
-        self.style.configure("Accent.TButton", background=accent_color, foreground="#11111b")
-        self.style.map("Accent.TButton", background=[("active", "#b4befe")])
-        self.style.configure("TNotebook", background=bg_dark, borderwidth=0)
-        self.style.configure("TNotebook.Tab", font=("Segoe UI", 10, "bold"), padding=[12, 6])
-        self.style.map("TNotebook.Tab", background=[("selected", card_bg), ("!selected", bg_dark)],
-                                        foreground=[("selected", accent_color), ("!selected", fg_light)])
+        # Style mặc định
+        self.style.configure(".", background=self.colors["bg_dark"], foreground=self.colors["text_main"], font=("Segoe UI", 10))
+        
+        # Style Frames
+        self.style.configure("TFrame", background=self.colors["bg_dark"])
+        self.style.configure("Card.TFrame", background=self.colors["card_bg"], relief="flat", borderwidth=1)
+        self.style.configure("Header.TFrame", background=self.colors["card_bg"])
+
+        # Style Labels
+        self.style.configure("TLabel", background=self.colors["bg_dark"], foreground=self.colors["text_main"])
+        self.style.configure("Card.TLabel", background=self.colors["card_bg"], foreground=self.colors["text_main"])
+        self.style.configure("Sub.TLabel", background=self.colors["card_bg"], foreground=self.colors["text_sub"], font=("Segoe UI", 9))
+        self.style.configure("Title.TLabel", background=self.colors["card_bg"], font=("Segoe UI", 14, "bold"), foreground=self.colors["accent"])
+        self.style.configure("Section.TLabel", background=self.colors["card_bg"], font=("Segoe UI", 11, "bold"), foreground=self.colors["accent"])
+
+        # Style Buttons
+        self.style.configure("TButton", font=("Segoe UI", 10, "bold"), padding=6, relief="flat", background=self.colors["card_border"], foreground=self.colors["text_main"])
+        self.style.map("TButton", background=[("active", self.colors["accent"]), ("disabled", "#2a2b3d")], foreground=[("active", "#11111b")])
+
+        self.style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"), padding=8, background=self.colors["accent"], foreground="#11111b")
+        self.style.map("Accent.TButton", background=[("active", self.colors["accent_hover"]), ("disabled", "#313244")], foreground=[("disabled", "#6c7086")])
+
+        self.style.configure("Danger.TButton", font=("Segoe UI", 10, "bold"), padding=8, background=self.colors["danger"], foreground="#11111b")
+        self.style.map("Danger.TButton", background=[("active", "#f5e0dc")])
+
+        # Style Notebook Tabs
+        self.style.configure("TNotebook", background=self.colors["bg_dark"], borderwidth=0)
+        self.style.configure("TNotebook.Tab", font=("Segoe UI", 10, "bold"), padding=[16, 8], background=self.colors["bg_dark"], foreground=self.colors["text_sub"])
+        self.style.map("TNotebook.Tab", background=[("selected", self.colors["card_bg"])], foreground=[("selected", self.colors["accent"])])
+
+        # Style Entry & Combobox & Spinbox
+        self.style.configure("TEntry", fieldbackground=self.colors["input_bg"], foreground=self.colors["text_main"], borderwidth=1)
+        self.style.configure("TCombobox", fieldbackground=self.colors["input_bg"], background=self.colors["card_bg"], foreground=self.colors["text_main"])
+        self.style.configure("TSpinbox", fieldbackground=self.colors["input_bg"], background=self.colors["card_bg"], foreground=self.colors["text_main"])
 
     def create_widgets(self):
-        # 1. TOP BAR: Cấu hình địa chỉ Server & Thư mục Lưu
-        top_frame = ttk.Frame(self, style="Card.TFrame", padding=12)
-        top_frame.pack(fill="x", padx=12, pady=10)
+        # Header Logo & Subtitle
+        header_panel = ttk.Frame(self, style="Card.TFrame", padding=(16, 12))
+        header_panel.pack(fill="x", padx=14, pady=(12, 6))
 
-        # Hàng 1: API Server URL
-        lbl_api = ttk.Label(top_frame, text="🌐 URL Server API:", style="Card.TLabel", font=("Segoe UI", 10, "bold"))
-        lbl_api.grid(row=0, column=0, sticky="w", padx=5, pady=4)
+        lbl_logo = ttk.Label(header_panel, text="🎬 AI IMAGE & TEXT TO VIDEO STUDIO v2.0", style="Title.TLabel")
+        lbl_logo.pack(anchor="w")
 
-        entry_api = ttk.Entry(top_frame, textvariable=self.api_url_var, font=("Segoe UI", 10), width=50)
-        entry_api.grid(row=0, column=1, sticky="ew", padx=5, pady=4)
+        lbl_desc = ttk.Label(
+            header_panel,
+            text="Hệ thống khởi chạy Render Batch Video 3D chuyên nghiệp | Tự động hóa Prompt & Mã hóa Base64 Ảnh",
+            style="Sub.TLabel",
+        )
+        lbl_desc.pack(anchor="w", pady=(2, 0))
 
-        btn_test = ttk.Button(top_frame, text="🔌 Kiểm Tra Kết Nối", command=self.test_connection)
-        btn_test.grid(row=0, column=2, padx=5, pady=4)
+        # 1. TOP SERVER CONTROL CARD
+        server_card = ttk.Frame(self, style="Card.TFrame", padding=14)
+        server_card.pack(fill="x", padx=14, pady=6)
 
-        # Hàng 2: Thư mục kết quả (Output Dir)
-        lbl_out = ttk.Label(top_frame, text="📁 Thư Mục Lưu Video:", style="Card.TLabel", font=("Segoe UI", 10, "bold"))
-        lbl_out.grid(row=1, column=0, sticky="w", padx=5, pady=4)
+        # Hàng 1: URL Server & Status
+        lbl_api = ttk.Label(server_card, text="🌐 URL Server API:", style="Card.TLabel", font=("Segoe UI", 10, "bold"))
+        lbl_api.grid(row=0, column=0, sticky="w", padx=4, pady=4)
 
-        entry_out = ttk.Entry(top_frame, textvariable=self.output_dir_var, font=("Segoe UI", 10), width=50)
-        entry_out.grid(row=1, column=1, sticky="ew", padx=5, pady=4)
+        entry_api = ttk.Entry(server_card, textvariable=self.api_url_var, font=("Segoe UI", 10), width=48)
+        entry_api.grid(row=0, column=1, sticky="ew", padx=6, pady=4)
 
-        btn_browse_out = ttk.Button(top_frame, text="Chọn Thư Mục...", command=self.browse_output_dir)
-        btn_browse_out.grid(row=1, column=2, padx=5, pady=4)
+        btn_test = ttk.Button(server_card, text="🔌 Kiểm Tra Kết Nối", command=self.test_connection)
+        btn_test.grid(row=0, column=2, padx=4, pady=4)
 
-        top_frame.columnconfigure(1, weight=1)
+        self.lbl_connection_badge = ttk.Label(
+            server_card, textvariable=self.connection_status_var, style="Card.TLabel", font=("Segoe UI", 10, "bold")
+        )
+        self.lbl_connection_badge.grid(row=0, column=3, padx=10, pady=4, sticky="e")
 
-        # 2. TAB CONTROL: Tính năng 1 (Text List) & Tính năng 2 (Image Folder)
+        # Hàng 2: Thư mục đầu ra (Output Directory)
+        lbl_out = ttk.Label(server_card, text="📁 Thư Mục Lưu Video:", style="Card.TLabel", font=("Segoe UI", 10, "bold"))
+        lbl_out.grid(row=1, column=0, sticky="w", padx=4, pady=4)
+
+        entry_out = ttk.Entry(server_card, textvariable=self.output_dir_var, font=("Segoe UI", 10), width=48)
+        entry_out.grid(row=1, column=1, sticky="ew", padx=6, pady=4)
+
+        btn_browse_out = ttk.Button(server_card, text="Chọn Thư Mục...", command=self.browse_output_dir)
+        btn_browse_out.grid(row=1, column=2, padx=4, pady=4)
+
+        server_card.columnconfigure(1, weight=1)
+
+        # 2. TAB CONTROL
         self.notebook = ttk.Notebook(self)
-        self.notebook.pack(fill="both", expand=True, padx=12, pady=5)
+        self.notebook.pack(fill="both", expand=True, padx=14, pady=6)
 
-        self.tab_text = ttk.Frame(self.notebook, padding=10)
-        self.tab_image = ttk.Frame(self.notebook, padding=10)
+        self.tab_text = ttk.Frame(self.notebook, padding=12)
+        self.tab_image = ttk.Frame(self.notebook, padding=12)
 
-        self.notebook.add(self.tab_text, text="📝 Tính Năng 1: Text Prompt List -> Video")
-        self.notebook.add(self.tab_image, text="🖼️ Tính Năng 2: Folder Ảnh Base64 -> Video")
+        self.notebook.add(self.tab_text, text="📝 Tính Năng 1: Text Prompt List -> Video (1080x720 Mặc định)")
+        self.notebook.add(self.tab_image, text="🖼️ Tính Năng 2: Thư Mục Ảnh Base64 -> Video (1080x720 Mặc định)")
 
         self.setup_tab_text()
         self.setup_tab_image()
 
-        # 3. BOTTOM PANEL: Tiến độ & Log Hệ thống
-        bottom_frame = ttk.Frame(self, style="Card.TFrame", padding=10)
-        bottom_frame.pack(fill="x", padx=12, pady=10)
+        # 3. BOTTOM CONSOLE & PROGRESS PANEL
+        bottom_panel = ttk.Frame(self, style="Card.TFrame", padding=12)
+        bottom_panel.pack(fill="x", padx=14, pady=(6, 12))
+
+        # Progress Bar & Status Text
+        prog_top_frame = ttk.Frame(bottom_panel, style="Card.TFrame")
+        prog_top_frame.pack(fill="x", pady=(0, 4))
+
+        self.lbl_status = ttk.Label(prog_top_frame, text="Trạng thái: Sẵn sàng làm việc", style="Card.TLabel", font=("Segoe UI", 10, "bold"))
+        self.lbl_status.pack(side="left")
+
+        self.lbl_stats = ttk.Label(prog_top_frame, text="Đã hoàn tất: 0/0", style="Sub.TLabel")
+        self.lbl_stats.pack(side="right")
 
         self.progress_var = tk.DoubleVar()
-        self.progress_bar = ttk.Progressbar(bottom_frame, variable=self.progress_var, maximum=100)
+        self.progress_bar = ttk.Progressbar(bottom_panel, variable=self.progress_var, maximum=100)
         self.progress_bar.pack(fill="x", pady=4)
 
-        self.lbl_status = ttk.Label(bottom_frame, text="Trạng thái: Sẵn sàng", style="Card.TLabel")
-        self.lbl_status.pack(anchor="w", pady=2)
+        # Log Text Console
+        log_header_frame = ttk.Frame(bottom_panel, style="Card.TFrame")
+        log_header_frame.pack(fill="x", pady=(6, 2))
 
-        # Log Text Box
-        log_frame = ttk.Frame(bottom_frame)
+        ttk.Label(log_header_frame, text="💻 Nhật Ký Tiến Trình Hệ Thống (Console Log):", style="Card.TLabel", font=("Segoe UI", 9, "bold")).pack(side="left")
+
+        btn_clear_log = ttk.Button(log_header_frame, text="Xóa Log", command=self.clear_logs)
+        btn_clear_log.pack(side="right", padx=2)
+
+        log_frame = ttk.Frame(bottom_panel)
         log_frame.pack(fill="both", expand=True, pady=4)
 
         self.log_text = tk.Text(
-            log_frame, height=6, bg="#181825", fg="#a6adc8", font=("Consolas", 9), relief="flat", wrap="word"
+            log_frame, height=5, bg=self.colors["input_bg"], fg=self.colors["text_main"], font=("Consolas", 9), relief="flat", wrap="word"
         )
         scrollbar = ttk.Scrollbar(log_frame, command=self.log_text.yview)
         self.log_text.configure(yscrollcommand=scrollbar.set)
@@ -142,135 +248,183 @@ class ImageToVideoClientApp(tk.Tk):
         self.log_text.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-    # ================= TAB 1: TEXT PROMPTS =================
+    # ================= TAB 1: TEXT PROMPTS SETUP =================
     def setup_tab_text(self):
-        lbl = ttk.Label(self.tab_text, text="Nhập danh sách Text Prompt (mỗi prompt nằm trên 1 dòng):", style="Header.TLabel")
-        lbl.pack(anchor="w", pady=(0, 5))
+        lbl = ttk.Label(self.tab_text, text="Nhập danh sách Text Prompts (Mỗi prompt 1 dòng):", style="Section.TLabel")
+        lbl.pack(anchor="w", pady=(0, 6))
 
-        # Khung chứa Textbox & Tùy chọn
-        mid_frame = ttk.Frame(self.tab_text)
-        mid_frame.pack(fill="both", expand=True)
+        # Box nhập text prompts
+        txt_frame = ttk.Frame(self.tab_text)
+        txt_frame.pack(fill="both", expand=True, pady=(0, 8))
 
-        self.txt_prompts = tk.Text(mid_frame, height=10, bg="#181825", fg="#cdd6f4", font=("Segoe UI", 10), insertbackground="white")
-        txt_scroll = ttk.Scrollbar(mid_frame, command=self.txt_prompts.yview)
+        self.txt_prompts = tk.Text(
+            txt_frame, height=8, bg=self.colors["input_bg"], fg=self.colors["text_main"], font=("Segoe UI", 10), insertbackground="white", relief="flat"
+        )
+        txt_scroll = ttk.Scrollbar(txt_frame, command=self.txt_prompts.yview)
         self.txt_prompts.configure(yscrollcommand=txt_scroll.set)
 
         self.txt_prompts.pack(side="left", fill="both", expand=True)
         txt_scroll.pack(side="right", fill="y")
 
-        # Ví dụ gợi ý
+        # Nội dung mẫu mặc định
         sample_prompts = (
-            "A serene Japanese garden in spring with cherry blossoms falling, 4k cinematic\n"
-            "A futuristic cyberpunk street at midnight with neon lights reflections\n"
-            "A majestic waterfall inside a tropical rainforest with rainbow light"
+            "A serene cyberpunk neon city at sunset with rain reflections, 4k hyperrealistic\n"
+            "A majestic glowing phoenix bird flying above mist covered mountains at dawn\n"
+            "A cozy wooden cabin inside a snowy pine forest under aurora borealis"
         )
         self.txt_prompts.insert("1.0", sample_prompts)
 
-        # Các tùy chọn tham số
-        opts_frame = ttk.Frame(self.tab_text, padding=5)
-        opts_frame.pack(fill="x", pady=8)
+        # CẤU HÌNH THAM SỐ (Bao gồm độ phân giải mặc định 1080 x 720)
+        opts_card = ttk.Frame(self.tab_text, style="Card.TFrame", padding=10)
+        opts_card.pack(fill="x", pady=6)
 
-        ttk.Label(opts_frame, text="Chiều rộng (width):").grid(row=0, column=0, padx=4)
-        self.spn_txt_width = ttk.Spinbox(opts_frame, from_=256, to=2048, increment=64, width=6)
-        self.spn_txt_width.set(1024)
-        self.spn_txt_width.grid(row=0, column=1, padx=4)
+        # Hàng 1: Preset độ phân giải & Khung hình
+        ttk.Label(opts_card, text="📐 Khung Ảnh (Width x Height):", style="Card.TLabel", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="w", padx=4, pady=4)
 
-        ttk.Label(opts_frame, text="Chiều cao (height):").grid(row=0, column=2, padx=4)
-        self.spn_txt_height = ttk.Spinbox(opts_frame, from_=256, to=2048, increment=64, width=6)
-        self.spn_txt_height.set(720)
-        self.spn_txt_height.grid(row=0, column=3, padx=4)
+        self.preset_var = tk.StringVar(value="1080 x 720 (HD - Mặc định)")
+        cmb_preset = ttk.Combobox(opts_card, textvariable=self.preset_var, values=list(RESOLUTION_PRESETS.keys()), state="readonly", width=28)
+        cmb_preset.grid(row=0, column=1, padx=4, pady=4)
+        cmb_preset.bind("<<ComboboxSelected>>", self.on_resolution_preset_changed)
 
-        ttk.Label(opts_frame, text="Frames:").grid(row=0, column=4, padx=4)
-        self.spn_txt_frames = ttk.Spinbox(opts_frame, from_=10, to=600, increment=15, width=6)
-        self.spn_txt_frames.set(225)
-        self.spn_txt_frames.grid(row=0, column=5, padx=4)
+        ttk.Label(opts_card, text="Width:").grid(row=0, column=2, padx=4, pady=4)
+        self.spn_txt_width = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
+        self.spn_txt_width.set(1080)  # MẶC ĐỊNH 1080
+        self.spn_txt_width.grid(row=0, column=3, padx=4, pady=4)
 
-        ttk.Label(opts_frame, text="FPS:").grid(row=0, column=6, padx=4)
-        self.spn_txt_fps = ttk.Spinbox(opts_frame, from_=5, to=60, increment=1, width=5)
+        ttk.Label(opts_card, text="Height:").grid(row=0, column=4, padx=4, pady=4)
+        self.spn_txt_height = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
+        self.spn_txt_height.set(720)  # MẶC ĐỊNH 720
+        self.spn_txt_height.grid(row=0, column=5, padx=4, pady=4)
+
+        # Hàng 2: Frames, FPS, Hiệu ứng
+        ttk.Label(opts_card, text="🎬 Hiệu Ứng Camera 3D:", style="Card.TLabel", font=("Segoe UI", 9, "bold")).grid(row=1, column=0, sticky="w", padx=4, pady=4)
+
+        self.txt_motion_var = tk.StringVar(value="random")
+        cmb_txt_motion = ttk.Combobox(
+            opts_card,
+            textvariable=self.txt_motion_var,
+            values=[v for k, v in MOTION_LABELS.items()],
+            state="readonly",
+            width=28,
+        )
+        cmb_txt_motion.grid(row=1, column=1, padx=4, pady=4)
+        cmb_txt_motion.set(MOTION_LABELS["random"])
+
+        ttk.Label(opts_card, text="Frames:").grid(row=1, column=2, padx=4, pady=4)
+        self.spn_txt_frames = ttk.Spinbox(opts_card, from_=10, to=600, increment=15, width=6)
+        self.spn_txt_frames.set(225)  # 15s ở 15fps
+        self.spn_txt_frames.grid(row=1, column=3, padx=4, pady=4)
+
+        ttk.Label(opts_card, text="FPS:").grid(row=1, column=4, padx=4, pady=4)
+        self.spn_txt_fps = ttk.Spinbox(opts_card, from_=5, to=60, increment=1, width=6)
         self.spn_txt_fps.set(15)
-        self.spn_txt_fps.grid(row=0, column=7, padx=4)
+        self.spn_txt_fps.grid(row=1, column=5, padx=4, pady=4)
 
-        self.chk_txt_random = tk.BooleanVar(value=True)
-        chk_rnd = ttk.Checkbutton(opts_frame, text="🎲 Random Hiệu Ứng Camera 3D", variable=self.chk_txt_random)
-        chk_rnd.grid(row=0, column=8, padx=10)
+        # Hàng Nút Bắt Đầu / Dừng
+        btn_action_frame = ttk.Frame(self.tab_text)
+        btn_action_frame.pack(fill="x", pady=8)
 
-        # Nút điều khiển
-        btn_frame = ttk.Frame(self.tab_text)
-        btn_frame.pack(fill="x", pady=5)
+        self.btn_run_text = ttk.Button(
+            btn_action_frame, text="🚀 KHỞI CHẠY RENDER DANH SÁCH TEXT PROMPTS", style="Accent.TButton", command=self.start_text_batch
+        )
+        self.btn_run_text.pack(side="left", padx=(0, 6))
 
-        self.btn_run_text = ttk.Button(btn_frame, text="🚀 ĐÀO THẢI / RENDER DANH SÁCH TEXT", style="Accent.TButton", command=self.start_text_batch)
-        self.btn_run_text.pack(side="left", padx=5)
+        self.btn_stop_text = ttk.Button(btn_action_frame, text="⏹️ DỪNG TIẾN TRÌNH", style="Danger.TButton", command=self.request_stop, state="disabled")
+        self.btn_stop_text.pack(side="left")
 
-        self.btn_stop_text = ttk.Button(btn_frame, text="⏹️ Dừng", command=self.request_stop, state="disabled")
-        self.btn_stop_text.pack(side="left", padx=5)
+    def on_resolution_preset_changed(self, event):
+        preset_name = self.preset_var.get()
+        if preset_name in RESOLUTION_PRESETS:
+            w, h = RESOLUTION_PRESETS[preset_name]
+            self.spn_txt_width.set(w)
+            self.spn_txt_height.set(h)
 
-    # ================= TAB 2: IMAGE FOLDER =================
+    # ================= TAB 2: IMAGE FOLDER SETUP =================
     def setup_tab_image(self):
-        lbl = ttk.Label(self.tab_image, text="Chọn Thư Mục Chứa Ảnh để Render Video (Base64 Mode):", style="Header.TLabel")
-        lbl.pack(anchor="w", pady=(0, 5))
+        lbl = ttk.Label(self.tab_image, text="Chọn Thư Mục Chứa Ảnh để Render Video (Base64 Mode):", style="Section.TLabel")
+        lbl.pack(anchor="w", pady=(0, 6))
 
-        # Khung chọn folder
-        folder_frame = ttk.Frame(self.tab_image)
-        folder_frame.pack(fill="x", pady=5)
+        # Hàng chọn thư mục
+        folder_card = ttk.Frame(self.tab_image, style="Card.TFrame", padding=10)
+        folder_card.pack(fill="x", pady=(0, 8))
 
         self.img_folder_var = tk.StringVar()
-        entry_img_dir = ttk.Entry(folder_frame, textvariable=self.img_folder_var, font=("Segoe UI", 10))
-        entry_img_dir.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        entry_img_dir = ttk.Entry(folder_card, textvariable=self.img_folder_var, font=("Segoe UI", 10))
+        entry_img_dir.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
-        btn_browse_img = ttk.Button(folder_frame, text="📁 Chọn Thư Mục Ảnh...", command=self.browse_image_folder)
+        btn_browse_img = ttk.Button(folder_card, text="📁 Chọn Thư Mục Ảnh...", command=self.browse_image_folder)
         btn_browse_img.pack(side="right")
 
-        # Danh sách ảnh tìm thấy
-        lbl_files = ttk.Label(self.tab_image, text="Danh sách các file ảnh sẽ được xử lý:")
-        lbl_files.pack(anchor="w", pady=(8, 2))
+        # Danh sách file ảnh tìm thấy
+        lbl_files = ttk.Label(self.tab_image, text="Danh sách các file ảnh hợp lệ được quét trong thư mục:")
+        lbl_files.pack(anchor="w", pady=(4, 2))
 
         list_frame = ttk.Frame(self.tab_image)
-        list_frame.pack(fill="both", expand=True)
+        list_frame.pack(fill="both", expand=True, pady=(0, 8))
 
-        self.lst_images = tk.Listbox(list_frame, bg="#181825", fg="#cdd6f4", font=("Consolas", 9), selectbackground="#45475a")
+        self.lst_images = tk.Listbox(
+            list_frame, bg=self.colors["input_bg"], fg=self.colors["text_main"], font=("Consolas", 9), relief="flat", selectbackground="#45475a"
+        )
         lst_scroll = ttk.Scrollbar(list_frame, command=self.lst_images.yview)
         self.lst_images.configure(yscrollcommand=lst_scroll.set)
 
         self.lst_images.pack(side="left", fill="both", expand=True)
         lst_scroll.pack(side="right", fill="y")
 
-        # Các tùy chọn tham số
-        opts_frame = ttk.Frame(self.tab_image, padding=5)
-        opts_frame.pack(fill="x", pady=8)
+        # CẤU HÌNH THAM SỐ TAB 2
+        opts_card = ttk.Frame(self.tab_image, style="Card.TFrame", padding=10)
+        opts_card.pack(fill="x", pady=6)
 
-        ttk.Label(opts_frame, text="Frames:").grid(row=0, column=0, padx=4)
-        self.spn_img_frames = ttk.Spinbox(opts_frame, from_=10, to=600, increment=15, width=6)
+        ttk.Label(opts_card, text="🎬 Hiệu Ứng Camera 3D:", style="Card.TLabel", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="w", padx=4, pady=4)
+
+        self.img_motion_var = tk.StringVar(value="random")
+        cmb_img_motion = ttk.Combobox(
+            opts_card,
+            textvariable=self.img_motion_var,
+            values=[v for k, v in MOTION_LABELS.items()],
+            state="readonly",
+            width=28,
+        )
+        cmb_img_motion.grid(row=0, column=1, padx=4, pady=4)
+        cmb_img_motion.set(MOTION_LABELS["random"])
+
+        ttk.Label(opts_card, text="Frames:").grid(row=0, column=2, padx=4, pady=4)
+        self.spn_img_frames = ttk.Spinbox(opts_card, from_=10, to=600, increment=15, width=6)
         self.spn_img_frames.set(225)
-        self.spn_img_frames.grid(row=0, column=1, padx=4)
+        self.spn_img_frames.grid(row=0, column=3, padx=4, pady=4)
 
-        ttk.Label(opts_frame, text="FPS:").grid(row=0, column=2, padx=4)
-        self.spn_img_fps = ttk.Spinbox(opts_frame, from_=5, to=60, increment=1, width=5)
+        ttk.Label(opts_card, text="FPS:").grid(row=0, column=4, padx=4, pady=4)
+        self.spn_img_fps = ttk.Spinbox(opts_card, from_=5, to=60, increment=1, width=6)
         self.spn_img_fps.set(15)
-        self.spn_img_fps.grid(row=0, column=3, padx=4)
+        self.spn_img_fps.grid(row=0, column=5, padx=4, pady=4)
 
-        self.chk_img_random = tk.BooleanVar(value=True)
-        chk_rnd = ttk.Checkbutton(opts_frame, text="🎲 Random Hiệu Ứng Camera 3D", variable=self.chk_img_random)
-        chk_rnd.grid(row=0, column=4, padx=10)
+        # Nút Bắt Đầu / Dừng Tab 2
+        btn_action_frame = ttk.Frame(self.tab_image)
+        btn_action_frame.pack(fill="x", pady=8)
 
-        # Nút điều khiển
-        btn_frame = ttk.Frame(self.tab_image)
-        btn_frame.pack(fill="x", pady=5)
+        self.btn_run_img = ttk.Button(
+            btn_action_frame, text="🚀 KHỞI CHẠY RENDER TẤT CẢ ÁNH TRONG THƯ MỤC", style="Accent.TButton", command=self.start_image_batch
+        )
+        self.btn_run_img.pack(side="left", padx=(0, 6))
 
-        self.btn_run_img = ttk.Button(btn_frame, text="🚀 RENDER TẤT CẢ ÁNH TRONG FOLDER", style="Accent.TButton", command=self.start_image_batch)
-        self.btn_run_img.pack(side="left", padx=5)
+        self.btn_stop_img = ttk.Button(btn_action_frame, text="⏹️ DỪNG TIẾN TRÌNH", style="Danger.TButton", command=self.request_stop, state="disabled")
+        self.btn_stop_img.pack(side="left")
 
-        self.btn_stop_img = ttk.Button(btn_frame, text="⏹️ Dừng", command=self.request_stop, state="disabled")
-        self.btn_stop_img.pack(side="left", padx=5)
-
-    # ================= LOG & HELPER UTILS =================
+    # ================= UTILITY METHODS =================
     def log(self, message: str):
         timestamp = time.strftime("%H:%M:%S")
         formatted = f"[{timestamp}] {message}\n"
         self.log_text.insert("end", formatted)
         self.log_text.see("end")
 
+    def clear_logs(self):
+        self.log_text.delete("1.0", "end")
+
     def update_status(self, text: str):
         self.lbl_status.config(text=f"Trạng thái: {text}")
+
+    def update_stats_label(self):
+        self.lbl_stats.config(text=f"Hoàn tất: {self.success_count}/{self.total_tasks} | Lỗi: {self.failed_count}")
 
     def get_api_base(self) -> str:
         url = self.api_url_var.get().strip().rstrip("/")
@@ -300,24 +454,28 @@ class ImageToVideoClientApp(tk.Tk):
         for f in files:
             self.lst_images.insert("end", f.name)
 
-        self.log(f"Tìm thấy {len(files)} file ảnh hợp lệ trong thư mục: {folder_path}")
+        self.log(f"🔍 Đã tìm thấy {len(files)} file ảnh hợp lệ trong thư mục: {folder_path}")
 
     def test_connection(self):
         base_url = self.get_api_base()
-        self.log(f"Đang kiểm tra kết nối tới Server: {base_url} ...")
+        self.log(f"🔌 Đang kiểm tra kết nối tới Server: {base_url} ...")
+        self.connection_status_var.set("🟡 Đang kết nối...")
 
         def run_test():
             try:
                 res = requests.get(f"{base_url}/health", timeout=8)
                 if res.status_code == 200:
                     data = res.json()
-                    self.after(0, lambda: messagebox.showinfo("Thành công", f"Kết nối Server thành công!\nTrạng thái: {data.get('status')}"))
+                    self.after(0, lambda: self.connection_status_var.set("🟢 Đã kết nối (Online)"))
+                    self.after(0, lambda: messagebox.showinfo("Kết Nối Thành Công", f"Kết nối Server thành công!\nTrạng thái: {data.get('status')}"))
                     self.after(0, lambda: self.log(f"✅ Kết nối Server thành công: {data}"))
                 else:
-                    self.after(0, lambda: messagebox.showwarning("Lỗi", f"Server trả về mã HTTP {res.status_code}"))
+                    self.after(0, lambda: self.connection_status_var.set("🔴 Lỗi HTTP"))
+                    self.after(0, lambda: messagebox.showwarning("Lỗi Server", f"Server trả về mã HTTP {res.status_code}"))
             except Exception as e:
+                self.after(0, lambda: self.connection_status_var.set("🔴 Lỗi kết nối"))
                 self.after(0, lambda: messagebox.showerror("Lỗi Kết Nối", f"Không thể kết nối Server:\n{str(e)}"))
-                self.after(0, lambda: self.log(f"❌ Lỗi kết nối: {str(e)}"))
+                self.after(0, lambda: self.log(f"❌ Lỗi kết nối API Server: {str(e)}"))
 
         threading.Thread(target=run_test, daemon=True).start()
 
@@ -332,18 +490,23 @@ class ImageToVideoClientApp(tk.Tk):
     def request_stop(self):
         if self.is_processing:
             self.stop_requested = True
-            self.log("⚠️ Đã nhận yêu cầu DỪNG tiến trình sau khi tác vụ hiện tại hoàn tất...")
+            self.log("⚠️ Đã nhận yêu cầu DỪNG tiến trình sau khi hoàn tất tác vụ hiện tại...")
 
-    # ================= MAIN RENDER PIPELINE =================
+    def get_selected_motion_code(self, label_value: str) -> str:
+        for code, label in MOTION_LABELS.items():
+            if label == label_value:
+                if code == "random":
+                    return random.choice(MOTION_EFFECTS)
+                return code
+        return random.choice(MOTION_EFFECTS)
+
+    # ================= PIPELINE XỬ LÝ TÁC VỤ =================
     def wait_and_download_task(self, base_url: str, task_id: str, save_filename: str) -> bool:
-        """Kiểm tra tiến độ tác vụ từ Server và tải file video khi completed."""
         status_url = f"{base_url}/status/{task_id}"
         download_url = f"{base_url}/download/{task_id}"
         out_dir = Path(self.output_dir_var.get().strip())
         out_dir.mkdir(parents=True, exist_ok=True)
         dest_path = out_dir / save_filename
-
-        start_time = time.time()
 
         while not self.stop_requested:
             try:
@@ -358,30 +521,36 @@ class ImageToVideoClientApp(tk.Tk):
                     self.after(0, lambda d=detail: self.update_status(d))
 
                     if status == "completed":
-                        self.log(f"✅ Tác vụ {task_id[:8]} hoàn tất! Bắt đầu tải video...")
+                        self.log(f"✅ Tác vụ {task_id[:8]} hoàn tất! Đang tải file video...")
                         dl_res = requests.get(download_url, timeout=60, stream=True)
                         if dl_res.status_code == 200:
                             with open(dest_path, "wb") as f:
                                 for chunk in dl_res.iter_content(chunk_size=8192):
                                     f.write(chunk)
                             self.log(f"💾 Đã lưu Video: {dest_path}")
+                            self.success_count += 1
+                            self.update_stats_label()
                             return True
                         else:
-                            self.log(f"❌ Không thể tải video: HTTP {dl_res.status_code}")
+                            self.log(f"❌ Lỗi tải video: HTTP {dl_res.status_code}")
+                            self.failed_count += 1
+                            self.update_stats_label()
                             return False
                     elif status == "failed":
                         self.log(f"❌ Tác vụ {task_id[:8]} thất bại: {data.get('error')}")
+                        self.failed_count += 1
+                        self.update_stats_label()
                         return False
 
                 time.sleep(2.0)
             except Exception as e:
-                self.log(f"⚠️ Thử lại kiểm tra trạng thái ({task_id[:8]}): {e}")
+                self.log(f"⚠️ Kiểm tra lại trạng thái task ({task_id[:8]}): {e}")
                 time.sleep(3.0)
 
-        self.log(f"⏹️ Tác vụ {task_id[:8]} bị dừng bởi người dùng.")
+        self.log(f"⏹️ Tác vụ {task_id[:8]} đã được dừng.")
         return False
 
-    # --- TÍNH NĂNG 1: RENDER TEXT LIST ---
+    # --- TÍNH NĂNG 1: TEXT PROMPT BATCH ---
     def start_text_batch(self):
         raw_text = self.txt_prompts.get("1.0", "end").strip()
         prompts = [line.strip() for line in raw_text.splitlines() if line.strip()]
@@ -392,15 +561,20 @@ class ImageToVideoClientApp(tk.Tk):
 
         self.is_processing = True
         self.stop_requested = False
+        self.total_tasks = len(prompts)
+        self.success_count = 0
+        self.failed_count = 0
+        self.update_stats_label()
+
         self.set_buttons_state(True)
-        self.log(f"🚀 Khởi chạy Render Batch danh sách {len(prompts)} Text Prompts...")
+        self.log(f"\n🚀 Khởi chạy Render Batch danh sách {len(prompts)} Text Prompts...")
 
         base_url = self.get_api_base()
         width = int(self.spn_txt_width.get())
         height = int(self.spn_txt_height.get())
         num_frames = int(self.spn_txt_frames.get())
         fps = int(self.spn_txt_fps.get())
-        use_random = self.chk_txt_random.get()
+        selected_motion_label = self.txt_motion_var.get()
 
         def worker():
             total = len(prompts)
@@ -408,8 +582,8 @@ class ImageToVideoClientApp(tk.Tk):
                 if self.stop_requested:
                     break
 
-                effect = random.choice(MOTION_EFFECTS) if use_random else "zoom_in"
-                self.log(f"\n--- [{idx}/{total}] Prompt: '{prompt[:40]}...' (Hiệu ứng: {effect}) ---")
+                effect = self.get_selected_motion_code(selected_motion_label)
+                self.log(f"\n--- [{idx}/{total}] Prompt: '{prompt[:45]}...' | Độ phân giải: {width}x{height} | Hiệu ứng: {effect} ---")
 
                 payload = {
                     "prompt": prompt,
@@ -424,17 +598,21 @@ class ImageToVideoClientApp(tk.Tk):
                     res = requests.post(f"{base_url}/generate", json=payload, timeout=15)
                     if res.status_code == 202:
                         task_id = res.json().get("task_id")
-                        self.log(f"📩 Tác vụ đã được gửi, ID: {task_id}")
-                        safe_title = "".join(c if c.isalnum() else "_" for c in prompt[:25]).strip("_")
+                        self.log(f"📩 Tác vụ tiếp nhận thành công, Task ID: {task_id}")
+                        safe_title = "".join(c if c.isalnum() else "_" for c in prompt[:20]).strip("_")
                         save_filename = f"text_{idx:03d}_{safe_title}_{effect}.mp4"
 
                         self.wait_and_download_task(base_url, task_id, save_filename)
                     else:
                         self.log(f"❌ Lỗi gửi request ({res.status_code}): {res.text}")
+                        self.failed_count += 1
+                        self.update_stats_label()
                 except Exception as e:
-                    self.log(f"❌ Lỗi kết nối gửi task: {e}")
+                    self.log(f"❌ Lỗi kết nối khi gửi task: {e}")
+                    self.failed_count += 1
+                    self.update_stats_label()
 
-            self.after(0, lambda: self.log("\n🎉 HOÀN TẤT RENDERING TẤT CẢ PROMPTS!"))
+            self.after(0, lambda: self.log("\n🎉 HOÀN TẤT RENDERING TẤT CẢ TEXT PROMPTS!"))
             self.after(0, lambda: self.update_status("Hoàn tất!"))
             self.after(0, lambda: self.progress_var.set(100.0))
             self.after(0, lambda: self.set_buttons_state(False))
@@ -442,7 +620,7 @@ class ImageToVideoClientApp(tk.Tk):
 
         threading.Thread(target=worker, daemon=True).start()
 
-    # --- TÍNH NĂNG 2: RENDER FOLDER ÁNH BASE64 ---
+    # --- TÍNH NĂNG 2: IMAGE FOLDER BATCH (BASE64) ---
     def start_image_batch(self):
         folder_path = self.img_folder_var.get().strip()
         p = Path(folder_path)
@@ -454,18 +632,23 @@ class ImageToVideoClientApp(tk.Tk):
         files.sort()
 
         if not files:
-            messagebox.showwarning("Cảnh báo", "Không tìm thấy file ảnh hợp lệ nào trong thư mục này!")
+            messagebox.showwarning("Cảnh báo", "Không tìm thấy file ảnh hợp lệ nào trong thư mục!")
             return
 
         self.is_processing = True
         self.stop_requested = False
+        self.total_tasks = len(files)
+        self.success_count = 0
+        self.failed_count = 0
+        self.update_stats_label()
+
         self.set_buttons_state(True)
-        self.log(f"🚀 Khởi chạy Render Batch {len(files)} file ảnh từ thư mục...")
+        self.log(f"\n🚀 Khởi chạy Render Batch {len(files)} file ảnh từ thư mục...")
 
         base_url = self.get_api_base()
         num_frames = int(self.spn_img_frames.get())
         fps = int(self.spn_img_fps.get())
-        use_random = self.chk_img_random.get()
+        selected_motion_label = self.img_motion_var.get()
 
         def worker():
             total = len(files)
@@ -473,11 +656,10 @@ class ImageToVideoClientApp(tk.Tk):
                 if self.stop_requested:
                     break
 
-                effect = random.choice(MOTION_EFFECTS) if use_random else "3d_parallax"
-                self.log(f"\n--- [{idx}/{total}] Đang xử lý file ảnh: '{img_file.name}' (Hiệu ứng: {effect}) ---")
+                effect = self.get_selected_motion_code(selected_motion_label)
+                self.log(f"\n--- [{idx}/{total}] File ảnh: '{img_file.name}' | Hiệu ứng: {effect} ---")
 
                 try:
-                    # Chuyển ảnh thành chuỗi Base64
                     with open(img_file, "rb") as f:
                         img_bytes = f.read()
                     b64_str = base64.b64encode(img_bytes).decode("utf-8")
@@ -493,16 +675,20 @@ class ImageToVideoClientApp(tk.Tk):
                     res = requests.post(f"{base_url}/generate-from-image", json=payload, timeout=30)
                     if res.status_code == 202:
                         task_id = res.json().get("task_id")
-                        self.log(f"📩 Tác vụ đã được gửi thành công, ID: {task_id}")
+                        self.log(f"📩 Tác vụ Base64 tiếp nhận thành công, Task ID: {task_id}")
                         save_filename = f"img_{idx:03d}_{img_file.stem}_{effect}.mp4"
 
                         self.wait_and_download_task(base_url, task_id, save_filename)
                     else:
-                        self.log(f"❌ Lỗi gửi API ({res.status_code}): {res.text}")
+                        self.log(f"❌ Lỗi gửi request Base64 ({res.status_code}): {res.text}")
+                        self.failed_count += 1
+                        self.update_stats_label()
                 except Exception as e:
-                    self.log(f"❌ Lỗi đọc ảnh hoặc gửi request: {e}")
+                    self.log(f"❌ Lỗi mã hóa ảnh Base64 hoặc gửi request: {e}")
+                    self.failed_count += 1
+                    self.update_stats_label()
 
-            self.after(0, lambda: self.log("\n🎉 HOÀN TẤT RENDERING TẤT CẢ ÁNH TRONG FOLDER!"))
+            self.after(0, lambda: self.log("\n🎉 HOÀN TẤT RENDERING TẤT CẢ ÁNH TRONG THƯ MỤC!"))
             self.after(0, lambda: self.update_status("Hoàn tất!"))
             self.after(0, lambda: self.progress_var.set(100.0))
             self.after(0, lambda: self.set_buttons_state(False))
@@ -512,5 +698,5 @@ class ImageToVideoClientApp(tk.Tk):
 
 
 if __name__ == "__main__":
-    app = ImageToVideoClientApp()
+    app = ProfessionalVideoStudioApp()
     app.mainloop()
