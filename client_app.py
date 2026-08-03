@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """
 ===============================================================================
-🎬 AI IMAGE & TEXT TO VIDEO BATCH STUDIO v3.5
+🎬 AI IMAGE & TEXT TO VIDEO BATCH STUDIO v4.0 (Multi-threading & Save AI Image)
 ===============================================================================
 Ứng dụng Client GUI chuyên nghiệp kết nối API Image-to-Video Server.
 
-Tính năng cập nhật v3.5:
+Tính năng mới v4.0:
+- Hỗ trợ Chạy Đa Luồng Song Song (Multi-threading): Tùy chọn 1 đến 4 luồng (Mặc định 2 luồng, tối đa 4 luồng).
+- Checkbox "🖼️ Lưu Ảnh AI Sinh Ra (.png)" trong tab Text to Video: Tải ảnh gốc từ API /image/{task_id} về thư mục lưu.
 - 2 Tab tiêu đề chuẩn: "Text to video" và "Image to video".
 - Mặc định: Frame = 360, FPS = 20 (Độ phân giải 1080 x 720 HD, Random Hiệu Ứng 3D).
-- Đã loại bỏ phần Nhật Ký Tiến Trình Hệ Thống cũ, toàn bộ Log tập trung Real-time ở Bảng Status Monitor bên phải.
+- Bảng Monitor bên phải (Right Panel) hiển thị Real-time Log các lượt gọi GET /status/{task_id}.
 - Mặc định mở ở chế độ Full Screen maximized.
 ===============================================================================
 """
 
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import os
 import random
 import sys
@@ -73,7 +76,7 @@ RESOLUTION_PRESETS = {
 class ProfessionalVideoStudioApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("AI Image & Text To Video Batch Studio v3.5 (Full Screen)")
+        self.title("AI Image & Text To Video Batch Studio v4.0 (Multi-threading Studio)")
         
         # Đặt kích thước cơ sở & Phóng to Toàn màn hình (Full Screen Maximized)
         self.geometry("1360x860")
@@ -102,10 +105,14 @@ class ProfessionalVideoStudioApp(tk.Tk):
 
         self.configure_styles()
 
+        # Biến khóa luồng an toàn (Thread Lock)
+        self.counter_lock = threading.Lock()
+
         # Các biến quản lý dữ liệu giao diện
         self.api_url_var = tk.StringVar(value="https://tobacco-went-harper-que.trycloudflare.com")
         self.output_dir_var = tk.StringVar(value=str(Path.home() / "Downloads" / "AI_Videos"))
         self.connection_status_var = tk.StringVar(value="⚪ Chưa kết nối")
+        self.chk_txt_save_img_var = tk.BooleanVar(value=True)  # Mặc định TẢI KÈM ÁNH AI GỐC (.png)
 
         # Thống kê tiến trình & Task active
         self.active_task_id_var = tk.StringVar(value="Chưa có tác vụ")
@@ -157,6 +164,9 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.style.configure("TNotebook.Tab", font=("Segoe UI", 11, "bold"), padding=[20, 8], background=self.colors["bg_dark"], foreground=self.colors["text_sub"])
         self.style.map("TNotebook.Tab", background=[("selected", self.colors["card_bg"])], foreground=[("selected", self.colors["accent"])])
 
+        self.style.configure("TCheckbutton", background=self.colors["card_bg"], foreground=self.colors["text_main"], font=("Segoe UI", 10, "bold"))
+        self.style.map("TCheckbutton", background=[("active", self.colors["card_bg"])], foreground=[("active", self.colors["accent"])])
+
         self.style.configure("TEntry", fieldbackground=self.colors["input_bg"], foreground="#ffffff", font=("Segoe UI", 10, "bold"), borderwidth=1)
 
         # Style Combobox TƯƠNG PHẢN CAO, BẬT RÕ CHỮ
@@ -200,12 +210,12 @@ class ProfessionalVideoStudioApp(tk.Tk):
         header_panel = ttk.Frame(self, style="Card.TFrame", padding=(16, 12))
         header_panel.pack(fill="x", padx=14, pady=(12, 6))
 
-        lbl_logo = ttk.Label(header_panel, text="🎬 AI IMAGE & TEXT TO VIDEO STUDIO v3.5 (FULL SCREEN MODE)", style="Title.TLabel")
+        lbl_logo = ttk.Label(header_panel, text="🎬 AI IMAGE & TEXT TO VIDEO STUDIO v4.0", style="Title.TLabel")
         lbl_logo.pack(anchor="w")
 
         lbl_desc = ttk.Label(
             header_panel,
-            text="Hệ thống Render Batch Video 3D | Giao diện Full Screen & Bảng Status Real-time",
+            text="Hệ thống Render Batch Video 3D | Hỗ trợ Chạy Đa Luồng Song Song (Max 4 Luồng) & Tải Kèm Ảnh AI Gốc",
             style="Sub.TLabel",
         )
         lbl_desc.pack(anchor="w", pady=(2, 0))
@@ -262,7 +272,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.setup_tab_text()
         self.setup_tab_image()
 
-        # Khung Thanh Tiến Trình & Trạng Thái ở phía dưới bên trái (Đã bỏ Log Console cũ)
+        # Khung Thanh Tiến Trình & Trạng Thái ở phía dưới bên trái
         bottom_left_card = ttk.Frame(left_panel, style="Card.TFrame", padding=14)
         bottom_left_card.pack(fill="x", pady=(6, 0))
 
@@ -341,7 +351,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
         txt_frame.pack(fill="both", expand=True, pady=(0, 8))
 
         self.txt_prompts = tk.Text(
-            txt_frame, height=8, bg=self.colors["input_bg"], fg=self.colors["text_main"], font=("Segoe UI", 10), insertbackground="white", relief="flat"
+            txt_frame, height=7, bg=self.colors["input_bg"], fg=self.colors["text_main"], font=("Segoe UI", 10), insertbackground="white", relief="flat"
         )
         txt_scroll = ttk.Scrollbar(txt_frame, command=self.txt_prompts.yview)
         self.txt_prompts.configure(yscrollcommand=txt_scroll.set)
@@ -356,27 +366,29 @@ class ProfessionalVideoStudioApp(tk.Tk):
         )
         self.txt_prompts.insert("1.0", sample_prompts)
 
-        # CẤU HÌNH THAM SỐ (MẶC ĐỊNH FRAME=360, FPS=20)
+        # CẤU HÌNH THAM SỐ TAB 1 (FRAME=360, FPS=20, LUỒNG=2, TẢI KÈM ÁNH CHECKBOX)
         opts_card = ttk.Frame(self.tab_text, style="Card.TFrame", padding=10)
         opts_card.pack(fill="x", pady=6)
 
+        # Hàng 1: Khung Ảnh, Width, Height
         ttk.Label(opts_card, text="📐 Mẫu Khung Ảnh:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", padx=4, pady=4)
 
         self.preset_var = tk.StringVar(value="1080 x 720 (HD - Mặc định)")
-        cmb_preset = ttk.Combobox(opts_card, textvariable=self.preset_var, values=list(RESOLUTION_PRESETS.keys()), state="readonly", width=28)
+        cmb_preset = ttk.Combobox(opts_card, textvariable=self.preset_var, values=list(RESOLUTION_PRESETS.keys()), state="readonly", width=26)
         cmb_preset.grid(row=0, column=1, padx=4, pady=4)
         cmb_preset.bind("<<ComboboxSelected>>", self.on_resolution_preset_changed)
 
         ttk.Label(opts_card, text="Width:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=2, padx=4, pady=4)
-        self.spn_txt_width = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
+        self.spn_txt_width = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=5)
         self.spn_txt_width.set(1080)
         self.spn_txt_width.grid(row=0, column=3, padx=4, pady=4)
 
         ttk.Label(opts_card, text="Height:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=4, padx=4, pady=4)
-        self.spn_txt_height = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
+        self.spn_txt_height = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=5)
         self.spn_txt_height.set(720)
         self.spn_txt_height.grid(row=0, column=5, padx=4, pady=4)
 
+        # Hàng 2: Hiệu ứng 3D, Frames, FPS
         ttk.Label(opts_card, text="🎬 Hiệu Ứng 3D:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", padx=4, pady=4)
 
         self.txt_motion_var = tk.StringVar(value="random")
@@ -385,20 +397,29 @@ class ProfessionalVideoStudioApp(tk.Tk):
             textvariable=self.txt_motion_var,
             values=[v for k, v in MOTION_LABELS.items()],
             state="readonly",
-            width=28,
+            width=26,
         )
         cmb_txt_motion.grid(row=1, column=1, padx=4, pady=4)
         cmb_txt_motion.set(MOTION_LABELS["random"])
 
         ttk.Label(opts_card, text="Frames:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=2, padx=4, pady=4)
-        self.spn_txt_frames = ttk.Spinbox(opts_card, from_=10, to=600, increment=15, width=6)
+        self.spn_txt_frames = ttk.Spinbox(opts_card, from_=10, to=600, increment=15, width=5)
         self.spn_txt_frames.set(360)  # MẶC ĐỊNH 360 FRAMES
         self.spn_txt_frames.grid(row=1, column=3, padx=4, pady=4)
 
         ttk.Label(opts_card, text="FPS:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=4, padx=4, pady=4)
-        self.spn_txt_fps = ttk.Spinbox(opts_card, from_=5, to=60, increment=1, width=6)
+        self.spn_txt_fps = ttk.Spinbox(opts_card, from_=5, to=60, increment=1, width=5)
         self.spn_txt_fps.set(20)  # MẶC ĐỊNH 20 FPS
         self.spn_txt_fps.grid(row=1, column=5, padx=4, pady=4)
+
+        # Hàng 3: SỐ LUỒNG (WORKERS) & CHECKBOX TẢI KÈM ÁNH GỐC (.PNG)
+        ttk.Label(opts_card, text="⚡ Số Luồng (Workers):", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", padx=4, pady=4)
+        self.spn_txt_threads = ttk.Spinbox(opts_card, from_=1, to=4, increment=1, width=5)
+        self.spn_txt_threads.set(2)  # MẶC ĐỊNH 2 LUỒNG, MAX 4 LUỒNG
+        self.spn_txt_threads.grid(row=2, column=1, sticky="w", padx=4, pady=4)
+
+        chk_save_img = ttk.Checkbutton(opts_card, text="🖼️ Tải Kèm Ảnh AI Gốc (.png)", variable=self.chk_txt_save_img_var, style="TCheckbutton")
+        chk_save_img.grid(row=2, column=2, columnspan=4, sticky="w", padx=8, pady=4)
 
         btn_action_frame = ttk.Frame(self.tab_text)
         btn_action_frame.pack(fill="x", pady=8)
@@ -451,6 +472,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
         opts_card = ttk.Frame(self.tab_image, style="Card.TFrame", padding=10)
         opts_card.pack(fill="x", pady=6)
 
+        # Hàng 1: Hiệu ứng 3D, Frames, FPS
         ttk.Label(opts_card, text="🎬 Hiệu Ứng 3D:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", padx=4, pady=4)
 
         self.img_motion_var = tk.StringVar(value="random")
@@ -459,20 +481,26 @@ class ProfessionalVideoStudioApp(tk.Tk):
             textvariable=self.img_motion_var,
             values=[v for k, v in MOTION_LABELS.items()],
             state="readonly",
-            width=28,
+            width=26,
         )
         cmb_img_motion.grid(row=0, column=1, padx=4, pady=4)
         cmb_img_motion.set(MOTION_LABELS["random"])
 
         ttk.Label(opts_card, text="Frames:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=2, padx=4, pady=4)
-        self.spn_img_frames = ttk.Spinbox(opts_card, from_=10, to=600, increment=15, width=6)
+        self.spn_img_frames = ttk.Spinbox(opts_card, from_=10, to=600, increment=15, width=5)
         self.spn_img_frames.set(360)  # MẶC ĐỊNH 360 FRAMES
         self.spn_img_frames.grid(row=0, column=3, padx=4, pady=4)
 
         ttk.Label(opts_card, text="FPS:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=4, padx=4, pady=4)
-        self.spn_img_fps = ttk.Spinbox(opts_card, from_=5, to=60, increment=1, width=6)
+        self.spn_img_fps = ttk.Spinbox(opts_card, from_=5, to=60, increment=1, width=5)
         self.spn_img_fps.set(20)  # MẶC ĐỊNH 20 FPS
         self.spn_img_fps.grid(row=0, column=5, padx=4, pady=4)
+
+        # Hàng 2: SỐ LUỒNG (WORKERS) CHO TAB IMAGE TO VIDEO
+        ttk.Label(opts_card, text="⚡ Số Luồng (Workers):", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", padx=4, pady=4)
+        self.spn_img_threads = ttk.Spinbox(opts_card, from_=1, to=4, increment=1, width=5)
+        self.spn_img_threads.set(2)  # MẶC ĐỊNH 2 LUỒNG, MAX 4 LUỒNG
+        self.spn_img_threads.grid(row=1, column=1, sticky="w", padx=4, pady=4)
 
         btn_action_frame = ttk.Frame(self.tab_image)
         btn_action_frame.pack(fill="x", pady=8)
@@ -486,15 +514,15 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.btn_stop_img.pack(side="left")
 
     # ================= LOG & STATUS MONITOR UTILS =================
-    def log(self, message: str):
-        """Hàm ghi log tập trung gửi thẳng tới bảng Status Monitor bên phải."""
-        self.status_log(message)
-
     def status_log(self, message: str):
         timestamp = time.strftime("%H:%M:%S")
         formatted = f"[{timestamp}] {message}\n"
         self.status_log_text.insert("end", formatted)
         self.status_log_text.see("end")
+
+    def log(self, message: str):
+        """Tập trung log vào bảng Monitor Status bên phải."""
+        self.status_log(message)
 
     def clear_status_logs(self):
         self.status_log_text.delete("1.0", "end")
@@ -533,11 +561,11 @@ class ProfessionalVideoStudioApp(tk.Tk):
         for f in files:
             self.lst_images.insert("end", f.name)
 
-        self.log(f"🔍 Đã tìm thấy {len(files)} file ảnh hợp lệ trong thư mục: {folder_path}")
+        self.status_log(f"🔍 Đã tìm thấy {len(files)} file ảnh hợp lệ trong thư mục: {folder_path}")
 
     def test_connection(self):
         base_url = self.get_api_base()
-        self.log(f"🔌 Đang kiểm tra kết nối tới Server: {base_url} ...")
+        self.status_log(f"🔌 Đang kiểm tra kết nối tới Server: {base_url} ...")
         self.status_log(f"🌐 CALL: GET {base_url}/health")
         self.connection_status_var.set("🟡 Đang kết nối...")
 
@@ -549,7 +577,6 @@ class ProfessionalVideoStudioApp(tk.Tk):
                     self.after(0, lambda: self.connection_status_var.set("🟢 Đã kết nối (Online)"))
                     self.after(0, lambda: self.status_log(f"✅ RESP: 200 OK | {data}"))
                     self.after(0, lambda: messagebox.showinfo("Kết Nối Thành Công", f"Kết nối Server thành công!\nTrạng thái: {data.get('status')}"))
-                    self.after(0, lambda: self.log(f"✅ Kết nối Server thành công: {data}"))
                 else:
                     self.after(0, lambda: self.connection_status_var.set("🔴 Lỗi HTTP"))
                     self.after(0, lambda: self.status_log(f"❌ RESP: HTTP {res.status_code}"))
@@ -558,7 +585,6 @@ class ProfessionalVideoStudioApp(tk.Tk):
                 self.after(0, lambda: self.connection_status_var.set("🔴 Lỗi kết nối"))
                 self.after(0, lambda: self.status_log(f"❌ FAIL: {str(e)}"))
                 self.after(0, lambda: messagebox.showerror("Lỗi Kết Nối", f"Không thể kết nối Server:\n{str(e)}"))
-                self.after(0, lambda: self.log(f"❌ Lỗi kết nối API Server: {str(e)}"))
 
         threading.Thread(target=run_test, daemon=True).start()
 
@@ -573,7 +599,6 @@ class ProfessionalVideoStudioApp(tk.Tk):
     def request_stop(self):
         if self.is_processing:
             self.stop_requested = True
-            self.log("⚠️ Đã nhận yêu cầu DỪNG tiến trình sau khi hoàn tất tác vụ hiện tại...")
             self.status_log("⚠️ Yêu cầu DỪNG tiến trình được kích hoạt.")
 
     def get_selected_motion_code(self, label_value: str) -> str:
@@ -583,6 +608,26 @@ class ProfessionalVideoStudioApp(tk.Tk):
                     return random.choice(MOTION_EFFECTS)
                 return code
         return random.choice(MOTION_EFFECTS)
+
+    def download_image_task(self, base_url: str, task_id: str, save_filename: str) -> bool:
+        """Tải file ảnh AI gốc .png từ API /image/{task_id}."""
+        image_url = f"{base_url}/image/{task_id}"
+        out_dir = Path(self.output_dir_var.get().strip())
+        out_dir.mkdir(parents=True, exist_ok=True)
+        dest_path = out_dir / save_filename
+
+        try:
+            res = requests.get(image_url, timeout=30)
+            if res.status_code == 200:
+                with open(dest_path, "wb") as f:
+                    f.write(res.content)
+                self.status_log(f"🖼️ ĐÃ TẢI ÁNH AI GỐC (.png): {save_filename}")
+                return True
+            else:
+                self.status_log(f"⚠️ Không thể tải ảnh AI gốc: HTTP {res.status_code}")
+        except Exception as e:
+            self.status_log(f"⚠️ Lỗi tải ảnh AI gốc ({task_id[:8]}): {e}")
+        return False
 
     # ================= PIPELINE XỬ LÝ TÁC VỤ & REAL-TIME STATUS LOGGING =================
     def wait_and_download_task(self, base_url: str, task_id: str, save_filename: str) -> bool:
@@ -614,7 +659,6 @@ class ProfessionalVideoStudioApp(tk.Tk):
                     self.after(0, lambda d=detail: self.update_status(d))
 
                     if status == "completed":
-                        self.log(f"✅ Tác vụ {task_id[:8]} hoàn tất! Đang tải file video...")
                         self.status_log(f"🎉 TASK COMPLETED: {task_id[:8]} | Bắt đầu tải video...")
 
                         dl_res = requests.get(download_url, timeout=60, stream=True)
@@ -622,36 +666,34 @@ class ProfessionalVideoStudioApp(tk.Tk):
                             with open(dest_path, "wb") as f:
                                 for chunk in dl_res.iter_content(chunk_size=8192):
                                     f.write(chunk)
-                            self.log(f"💾 Đã lưu Video: {dest_path}")
-                            self.status_log(f"💾 ĐÃ TẢI THÀNH CÔNG: {save_filename}")
-                            self.success_count += 1
+                            self.status_log(f"💾 ĐÃ TẢI THÀNH CÔNG VIDEO: {save_filename}")
+                            with self.counter_lock:
+                                self.success_count += 1
                             self.after(0, self.update_stats_label)
                             return True
                         else:
-                            self.log(f"❌ Lỗi tải video: HTTP {dl_res.status_code}")
                             self.status_log(f"❌ ERROR DOWNLOAD: HTTP {dl_res.status_code}")
-                            self.failed_count += 1
+                            with self.counter_lock:
+                                self.failed_count += 1
                             self.after(0, self.update_stats_label)
                             return False
                     elif status == "failed":
                         err_msg = data.get('error')
-                        self.log(f"❌ Tác vụ {task_id[:8]} thất bại: {err_msg}")
                         self.status_log(f"❌ TASK FAILED: {task_id[:8]} | {err_msg}")
-                        self.failed_count += 1
+                        with self.counter_lock:
+                            self.failed_count += 1
                         self.after(0, self.update_stats_label)
                         return False
 
                 time.sleep(2.0)
             except Exception as e:
-                self.log(f"⚠️ Kiểm tra lại trạng thái task ({task_id[:8]}): {e}")
                 self.status_log(f"⚠️ RETRY POLLING ({task_id[:8]}): {e}")
                 time.sleep(3.0)
 
-        self.log(f"⏹️ Tác vụ {task_id[:8]} đã được dừng.")
         self.status_log(f"⏹️ TASK STOPPED BY USER: {task_id[:8]}")
         return False
 
-    # --- TÍNH NĂNG 1: TEXT PROMPT BATCH ---
+    # --- TÍNH NĂNG 1: TEXT TO VIDEO BATCH (MULTI-THREADING & SAVE AI IMAGE) ---
     def start_text_batch(self):
         raw_text = self.txt_prompts.get("1.0", "end").strip()
         prompts = [line.strip() for line in raw_text.splitlines() if line.strip()]
@@ -668,66 +710,77 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.update_stats_label()
 
         self.set_buttons_state(True)
-        self.log(f"\n🚀 Khởi chạy Render Batch danh sách {len(prompts)} Text Prompts...")
-        self.status_log(f"🚀 Bắt đầu Batch {len(prompts)} Prompts (Text to Video Mode)...")
 
         base_url = self.get_api_base()
         width = int(self.spn_txt_width.get())
         height = int(self.spn_txt_height.get())
         num_frames = int(self.spn_txt_frames.get())
         fps = int(self.spn_txt_fps.get())
+        max_workers = max(1, min(4, int(self.spn_txt_threads.get())))
+        save_image = self.chk_txt_save_img_var.get()
         selected_motion_label = self.txt_motion_var.get()
 
-        def worker():
-            total = len(prompts)
-            for idx, prompt in enumerate(prompts, start=1):
-                if self.stop_requested:
-                    break
+        self.status_log(f"🚀 Bắt đầu Batch {len(prompts)} Prompts (Text to Video Mode) - Chạy {max_workers} Luồng Song Song...")
 
-                effect = self.get_selected_motion_code(selected_motion_label)
-                self.log(f"\n--- [{idx}/{total}] Prompt: '{prompt[:45]}...' | {width}x{height} | Hiệu ứng: {effect} ---")
+        def process_single_prompt(idx_and_prompt):
+            idx, prompt = idx_and_prompt
+            if self.stop_requested:
+                return
 
-                payload = {
-                    "prompt": prompt,
-                    "width": width,
-                    "height": height,
-                    "num_frames": num_frames,
-                    "fps": fps,
-                    "motion_type": effect,
-                }
+            effect = self.get_selected_motion_code(selected_motion_label)
+            self.status_log(f"\n--- [Luồng {threading.current_thread().name}] [{idx}/{len(prompts)}] Prompt: '{prompt[:30]}...' | {width}x{height} | Hiệu ứng: {effect} ---")
 
-                try:
-                    self.status_log(f"📤 POST /generate | Prompt: '{prompt[:20]}...'")
-                    res = requests.post(f"{base_url}/generate", json=payload, timeout=15)
-                    if res.status_code == 202:
-                        task_id = res.json().get("task_id")
-                        self.log(f"📩 Tác vụ tiếp nhận thành công, Task ID: {task_id}")
-                        self.status_log(f"✅ POST 202 Accepted | Task ID: {task_id}")
-                        safe_title = "".join(c if c.isalnum() else "_" for c in prompt[:20]).strip("_")
-                        save_filename = f"text_{idx:03d}_{safe_title}_{effect}.mp4"
+            payload = {
+                "prompt": prompt,
+                "width": width,
+                "height": height,
+                "num_frames": num_frames,
+                "fps": fps,
+                "motion_type": effect,
+            }
 
-                        self.wait_and_download_task(base_url, task_id, save_filename)
-                    else:
-                        self.log(f"❌ Lỗi gửi request ({res.status_code}): {res.text}")
-                        self.status_log(f"❌ POST FAILED: HTTP {res.status_code}")
+            try:
+                self.status_log(f"📤 POST /generate | Prompt: '{prompt[:20]}...'")
+                res = requests.post(f"{base_url}/generate", json=payload, timeout=15)
+                if res.status_code == 202:
+                    task_id = res.json().get("task_id")
+                    self.status_log(f"✅ POST 202 Accepted | Task ID: {task_id}")
+                    safe_title = "".join(c if c.isalnum() else "_" for c in prompt[:20]).strip("_")
+                    save_filename = f"text_{idx:03d}_{safe_title}_{effect}.mp4"
+
+                    success = self.wait_and_download_task(base_url, task_id, save_filename)
+
+                    # Tải kèm ảnh AI gốc nếu chọn Checkbox
+                    if success and save_image:
+                        img_filename = f"text_{idx:03d}_{safe_title}.png"
+                        self.download_image_task(base_url, task_id, img_filename)
+                else:
+                    self.status_log(f"❌ POST FAILED: HTTP {res.status_code}")
+                    with self.counter_lock:
                         self.failed_count += 1
-                        self.after(0, self.update_stats_label)
-                except Exception as e:
-                    self.log(f"❌ Lỗi kết nối khi gửi task: {e}")
-                    self.status_log(f"❌ REQ EXCEPTION: {e}")
-                    self.failed_count += 1
                     self.after(0, self.update_stats_label)
+            except Exception as e:
+                self.status_log(f"❌ REQ EXCEPTION: {e}")
+                with self.counter_lock:
+                    self.failed_count += 1
+                self.after(0, self.update_stats_label)
 
-            self.after(0, lambda: self.log("\n🎉 HOÀN TẤT RENDERING TẤT CẢ TEXT PROMPTS!"))
+        def master_worker():
+            with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="Worker") as executor:
+                items = list(enumerate(prompts, start=1))
+                futures = [executor.submit(process_single_prompt, item) for item in items]
+                for future in futures:
+                    future.result()
+
             self.after(0, lambda: self.status_log("🎉 BATCH FINISHED: Hoàn tất tất cả Text Prompts."))
             self.after(0, lambda: self.update_status("Hoàn tất!"))
             self.after(0, lambda: self.progress_var.set(100.0))
             self.after(0, lambda: self.set_buttons_state(False))
             self.is_processing = False
 
-        threading.Thread(target=worker, daemon=True).start()
+        threading.Thread(target=master_worker, daemon=True).start()
 
-    # --- TÍNH NĂNG 2: IMAGE FOLDER BATCH (BASE64) ---
+    # --- TÍNH NĂNG 2: IMAGE TO VIDEO BATCH (MULTI-THREADING) ---
     def start_image_batch(self):
         folder_path = self.img_folder_var.get().strip()
         p = Path(folder_path)
@@ -750,64 +803,69 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.update_stats_label()
 
         self.set_buttons_state(True)
-        self.log(f"\n🚀 Khởi chạy Render Batch {len(files)} file ảnh từ thư mục...")
-        self.status_log(f"🚀 Bắt đầu Batch {len(files)} Ảnh (Base64 Mode)...")
 
         base_url = self.get_api_base()
         num_frames = int(self.spn_img_frames.get())
         fps = int(self.spn_img_fps.get())
+        max_workers = max(1, min(4, int(self.spn_img_threads.get())))
         selected_motion_label = self.img_motion_var.get()
 
-        def worker():
-            total = len(files)
-            for idx, img_file in enumerate(files, start=1):
-                if self.stop_requested:
-                    break
+        self.status_log(f"🚀 Bắt đầu Batch {len(files)} Ảnh (Base64 Mode) - Chạy {max_workers} Luồng Song Song...")
 
-                effect = self.get_selected_motion_code(selected_motion_label)
-                self.log(f"\n--- [{idx}/{total}] File ảnh: '{img_file.name}' | Hiệu ứng: {effect} ---")
+        def process_single_image(idx_and_file):
+            idx, img_file = idx_and_file
+            if self.stop_requested:
+                return
 
-                try:
-                    with open(img_file, "rb") as f:
-                        img_bytes = f.read()
-                    b64_str = base64.b64encode(img_bytes).decode("utf-8")
+            effect = self.get_selected_motion_code(selected_motion_label)
+            self.status_log(f"\n--- [Luồng {threading.current_thread().name}] [{idx}/{len(files)}] File ảnh: '{img_file.name}' | Hiệu ứng: {effect} ---")
 
-                    payload = {
-                        "image_base64": b64_str,
-                        "motion_type": effect,
-                        "num_frames": num_frames,
-                        "fps": fps,
-                        "prompt": f"Render Image: {img_file.stem}",
-                    }
+            try:
+                with open(img_file, "rb") as f:
+                    img_bytes = f.read()
+                b64_str = base64.b64encode(img_bytes).decode("utf-8")
 
-                    self.status_log(f"📤 POST /generate-from-image | Image: {img_file.name}")
-                    res = requests.post(f"{base_url}/generate-from-image", json=payload, timeout=30)
-                    if res.status_code == 202:
-                        task_id = res.json().get("task_id")
-                        self.log(f"📩 Tác vụ Base64 tiếp nhận thành công, Task ID: {task_id}")
-                        self.status_log(f"✅ POST 202 Accepted | Task ID: {task_id}")
-                        save_filename = f"img_{idx:03d}_{img_file.stem}_{effect}.mp4"
+                payload = {
+                    "image_base64": b64_str,
+                    "motion_type": effect,
+                    "num_frames": num_frames,
+                    "fps": fps,
+                    "prompt": f"Render Image: {img_file.stem}",
+                }
 
-                        self.wait_and_download_task(base_url, task_id, save_filename)
-                    else:
-                        self.log(f"❌ Lỗi gửi request Base64 ({res.status_code}): {res.text}")
-                        self.status_log(f"❌ POST BASE64 FAILED: HTTP {res.status_code}")
+                self.status_log(f"📤 POST /generate-from-image | Image: {img_file.name}")
+                res = requests.post(f"{base_url}/generate-from-image", json=payload, timeout=30)
+                if res.status_code == 202:
+                    task_id = res.json().get("task_id")
+                    self.status_log(f"✅ POST 202 Accepted | Task ID: {task_id}")
+                    save_filename = f"img_{idx:03d}_{img_file.stem}_{effect}.mp4"
+
+                    self.wait_and_download_task(base_url, task_id, save_filename)
+                else:
+                    self.status_log(f"❌ POST BASE64 FAILED: HTTP {res.status_code}")
+                    with self.counter_lock:
                         self.failed_count += 1
-                        self.after(0, self.update_stats_label)
-                except Exception as e:
-                    self.log(f"❌ Lỗi mã hóa ảnh Base64 hoặc gửi request: {e}")
-                    self.status_log(f"❌ EXCEPTION BASE64: {e}")
-                    self.failed_count += 1
                     self.after(0, self.update_stats_label)
+            except Exception as e:
+                self.status_log(f"❌ EXCEPTION BASE64: {e}")
+                with self.counter_lock:
+                    self.failed_count += 1
+                self.after(0, self.update_stats_label)
 
-            self.after(0, lambda: self.log("\n🎉 HOÀN TẤT RENDERING TẤT CẢ ÁNH TRONG THƯ MỤC!"))
+        def master_worker():
+            with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="Worker") as executor:
+                items = list(enumerate(files, start=1))
+                futures = [executor.submit(process_single_image, item) for item in items]
+                for future in futures:
+                    future.result()
+
             self.after(0, lambda: self.status_log("🎉 BATCH FINISHED: Hoàn tất tất cả Ảnh trong thư mục."))
             self.after(0, lambda: self.update_status("Hoàn tất!"))
             self.after(0, lambda: self.progress_var.set(100.0))
             self.after(0, lambda: self.set_buttons_state(False))
             self.is_processing = False
 
-        threading.Thread(target=worker, daemon=True).start()
+        threading.Thread(target=master_worker, daemon=True).start()
 
 
 if __name__ == "__main__":
