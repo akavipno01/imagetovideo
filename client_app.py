@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 """
 ===============================================================================
-🎬 AI IMAGE & TEXT TO VIDEO BATCH STUDIO v3.0 (Full Screen & High-Contrast Comboboxes)
+🎬 AI IMAGE & TEXT TO VIDEO BATCH STUDIO v3.5
 ===============================================================================
 Ứng dụng Client GUI chuyên nghiệp kết nối API Image-to-Video Server.
 
-Tính năng mới v3.0:
-- Mặc định ở chế độ Phóng To Toàn Màn Hình (Full Screen / Maximized).
-- Combobox chọn Khung Ảnh và Hiệu Ứng 3D được thiết kế chữ in đậm, màu trắng sáng tương phản cao cực kỳ rõ nét khi chọn xong.
-- Bảng Monitor bên phải (Right Panel) hiển thị Real-time Log các lượt gọi GET /status/{task_id}.
-- Mặc định độ phân giải chuẩn: 1080 x 720 (Hỗ trợ 1080p Full HD & Tùy chỉnh).
-- Kết nối tự động đến API Server (Colab Cloudflare Tunnel / Localhost).
-- Tính năng 1: Render danh sách Text Prompts với hiệu ứng 3D ngẫu nhiên/tùy chọn.
-- Tính năng 2: Quét thư mục ảnh, chuyển đổi Base64 và render video 3D hàng loạt.
+Tính năng cập nhật v3.5:
+- 2 Tab tiêu đề chuẩn: "Text to video" và "Image to video".
+- Mặc định: Frame = 360, FPS = 20 (Độ phân giải 1080 x 720 HD, Random Hiệu Ứng 3D).
+- Đã loại bỏ phần Nhật Ký Tiến Trình Hệ Thống cũ, toàn bộ Log tập trung Real-time ở Bảng Status Monitor bên phải.
+- Mặc định mở ở chế độ Full Screen maximized.
 ===============================================================================
 """
 
@@ -76,7 +73,7 @@ RESOLUTION_PRESETS = {
 class ProfessionalVideoStudioApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("AI Image & Text To Video Batch Studio v3.0 (Full Screen Studio)")
+        self.title("AI Image & Text To Video Batch Studio v3.5 (Full Screen)")
         
         # Đặt kích thước cơ sở & Phóng to Toàn màn hình (Full Screen Maximized)
         self.geometry("1360x860")
@@ -157,7 +154,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.style.map("Danger.TButton", background=[("active", "#f5e0dc")])
 
         self.style.configure("TNotebook", background=self.colors["bg_dark"], borderwidth=0)
-        self.style.configure("TNotebook.Tab", font=("Segoe UI", 10, "bold"), padding=[16, 8], background=self.colors["bg_dark"], foreground=self.colors["text_sub"])
+        self.style.configure("TNotebook.Tab", font=("Segoe UI", 11, "bold"), padding=[20, 8], background=self.colors["bg_dark"], foreground=self.colors["text_sub"])
         self.style.map("TNotebook.Tab", background=[("selected", self.colors["card_bg"])], foreground=[("selected", self.colors["accent"])])
 
         self.style.configure("TEntry", fieldbackground=self.colors["input_bg"], foreground="#ffffff", font=("Segoe UI", 10, "bold"), borderwidth=1)
@@ -203,12 +200,12 @@ class ProfessionalVideoStudioApp(tk.Tk):
         header_panel = ttk.Frame(self, style="Card.TFrame", padding=(16, 12))
         header_panel.pack(fill="x", padx=14, pady=(12, 6))
 
-        lbl_logo = ttk.Label(header_panel, text="🎬 AI IMAGE & TEXT TO VIDEO STUDIO v3.0 (FULL SCREEN MODE)", style="Title.TLabel")
+        lbl_logo = ttk.Label(header_panel, text="🎬 AI IMAGE & TEXT TO VIDEO STUDIO v3.5 (FULL SCREEN MODE)", style="Title.TLabel")
         lbl_logo.pack(anchor="w")
 
         lbl_desc = ttk.Label(
             header_panel,
-            text="Hệ thống Render Batch Video 3D | Giao diện Full Screen & Khung Combobox chữ trắng sáng tương phản cao",
+            text="Hệ thống Render Batch Video 3D | Giao diện Full Screen & Bảng Status Real-time",
             style="Sub.TLabel",
         )
         lbl_desc.pack(anchor="w", pady=(2, 0))
@@ -244,7 +241,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
 
         server_card.columnconfigure(1, weight=1)
 
-        # 2. KHU VỰC CHÍNH SPLIT: BÊN TRÁI (TABS & LOG CHUNG) + BÊN PHẢI (LOG STATUS MONITOR REALTIME)
+        # 2. KHU VỰC CHÍNH SPLIT: BÊN TRÁI (TABS & TIẾN TRÌNH) + BÊN PHẢI (LOG STATUS MONITOR REALTIME)
         main_split_frame = ttk.Frame(self)
         main_split_frame.pack(fill="both", expand=True, padx=14, pady=6)
 
@@ -258,14 +255,15 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.tab_text = ttk.Frame(self.notebook, padding=12)
         self.tab_image = ttk.Frame(self.notebook, padding=12)
 
-        self.notebook.add(self.tab_text, text="📝 Tính Năng 1: Text Prompt List -> Video (1080x720 Mặc định)")
-        self.notebook.add(self.tab_image, text="🖼️ Tính Năng 2: Thư Mục Ảnh Base64 -> Video (1080x720 Mặc định)")
+        # Đặt tên 2 Tab theo đúng yêu cầu người dùng
+        self.notebook.add(self.tab_text, text="📝 Text to video")
+        self.notebook.add(self.tab_image, text="🖼️ Image to video")
 
         self.setup_tab_text()
         self.setup_tab_image()
 
-        # Tiến trình & General Console Log ở phía dưới bên trái
-        bottom_left_card = ttk.Frame(left_panel, style="Card.TFrame", padding=12)
+        # Khung Thanh Tiến Trình & Trạng Thái ở phía dưới bên trái (Đã bỏ Log Console cũ)
+        bottom_left_card = ttk.Frame(left_panel, style="Card.TFrame", padding=14)
         bottom_left_card.pack(fill="x", pady=(6, 0))
 
         prog_top_frame = ttk.Frame(bottom_left_card, style="Card.TFrame")
@@ -279,27 +277,10 @@ class ProfessionalVideoStudioApp(tk.Tk):
 
         self.progress_var = tk.DoubleVar()
         self.progress_bar = ttk.Progressbar(bottom_left_card, variable=self.progress_var, maximum=100)
-        self.progress_bar.pack(fill="x", pady=4)
-
-        # General Console Log
-        gen_log_header = ttk.Frame(bottom_left_card, style="Card.TFrame")
-        gen_log_header.pack(fill="x", pady=(4, 2))
-        ttk.Label(gen_log_header, text="💻 Nhật Ký Tiến Trình Hệ Thống (Console Log):", style="Card.TLabel", font=("Segoe UI", 9, "bold")).pack(side="left")
-        ttk.Button(gen_log_header, text="Xóa Log", command=self.clear_general_logs).pack(side="right")
-
-        gen_log_frame = ttk.Frame(bottom_left_card)
-        gen_log_frame.pack(fill="both", expand=True, pady=2)
-
-        self.log_text = tk.Text(
-            gen_log_frame, height=5, bg=self.colors["input_bg"], fg=self.colors["text_main"], font=("Consolas", 9), relief="flat", wrap="word"
-        )
-        scrollbar_gen = ttk.Scrollbar(gen_log_frame, command=self.log_text.yview)
-        self.log_text.configure(yscrollcommand=scrollbar_gen.set)
-        self.log_text.pack(side="left", fill="both", expand=True)
-        scrollbar_gen.pack(side="right", fill="y")
+        self.progress_bar.pack(fill="x", pady=6)
 
         # --- BÊN PHẢI (RIGHT PANEL - DEDICATED STATUS MONITOR LOG 35% WIDTH) ---
-        right_panel = ttk.Frame(main_split_frame, style="Card.TFrame", padding=14, width=420)
+        right_panel = ttk.Frame(main_split_frame, style="Card.TFrame", padding=14, width=440)
         right_panel.pack(side="right", fill="both", expand=False, padx=(6, 0))
 
         # Tiêu đề Bảng Status Monitor
@@ -338,8 +319,8 @@ class ProfessionalVideoStudioApp(tk.Tk):
 
         self.status_log_text = tk.Text(
             st_log_frame,
-            height=22,
-            width=40,
+            height=26,
+            width=42,
             bg=self.colors["status_log_bg"],
             fg=self.colors["status_log_fg"],
             font=("Consolas", 9, "bold"),
@@ -351,7 +332,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.status_log_text.pack(side="left", fill="both", expand=True)
         scrollbar_st.pack(side="right", fill="y")
 
-    # ================= TAB 1: TEXT PROMPTS SETUP =================
+    # ================= TAB 1: TEXT TO VIDEO SETUP =================
     def setup_tab_text(self):
         lbl = ttk.Label(self.tab_text, text="Nhập danh sách Text Prompts (Mỗi prompt 1 dòng):", style="Section.TLabel")
         lbl.pack(anchor="w", pady=(0, 6))
@@ -360,7 +341,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
         txt_frame.pack(fill="both", expand=True, pady=(0, 8))
 
         self.txt_prompts = tk.Text(
-            txt_frame, height=7, bg=self.colors["input_bg"], fg=self.colors["text_main"], font=("Segoe UI", 10), insertbackground="white", relief="flat"
+            txt_frame, height=8, bg=self.colors["input_bg"], fg=self.colors["text_main"], font=("Segoe UI", 10), insertbackground="white", relief="flat"
         )
         txt_scroll = ttk.Scrollbar(txt_frame, command=self.txt_prompts.yview)
         self.txt_prompts.configure(yscrollcommand=txt_scroll.set)
@@ -375,7 +356,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
         )
         self.txt_prompts.insert("1.0", sample_prompts)
 
-        # CẤU HÌNH THAM SỐ (Bao gồm COMBOBOX TƯƠNG PHẢN CAO RÕ CHỮ)
+        # CẤU HÌNH THAM SỐ (MẶC ĐỊNH FRAME=360, FPS=20)
         opts_card = ttk.Frame(self.tab_text, style="Card.TFrame", padding=10)
         opts_card.pack(fill="x", pady=6)
 
@@ -411,12 +392,12 @@ class ProfessionalVideoStudioApp(tk.Tk):
 
         ttk.Label(opts_card, text="Frames:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=2, padx=4, pady=4)
         self.spn_txt_frames = ttk.Spinbox(opts_card, from_=10, to=600, increment=15, width=6)
-        self.spn_txt_frames.set(225)
+        self.spn_txt_frames.set(360)  # MẶC ĐỊNH 360 FRAMES
         self.spn_txt_frames.grid(row=1, column=3, padx=4, pady=4)
 
         ttk.Label(opts_card, text="FPS:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=4, padx=4, pady=4)
         self.spn_txt_fps = ttk.Spinbox(opts_card, from_=5, to=60, increment=1, width=6)
-        self.spn_txt_fps.set(15)
+        self.spn_txt_fps.set(20)  # MẶC ĐỊNH 20 FPS
         self.spn_txt_fps.grid(row=1, column=5, padx=4, pady=4)
 
         btn_action_frame = ttk.Frame(self.tab_text)
@@ -437,7 +418,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
             self.spn_txt_width.set(w)
             self.spn_txt_height.set(h)
 
-    # ================= TAB 2: IMAGE FOLDER SETUP =================
+    # ================= TAB 2: IMAGE TO VIDEO SETUP =================
     def setup_tab_image(self):
         lbl = ttk.Label(self.tab_image, text="Chọn Thư Mục Chứa Ảnh để Render Video (Base64 Mode):", style="Section.TLabel")
         lbl.pack(anchor="w", pady=(0, 6))
@@ -485,12 +466,12 @@ class ProfessionalVideoStudioApp(tk.Tk):
 
         ttk.Label(opts_card, text="Frames:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=2, padx=4, pady=4)
         self.spn_img_frames = ttk.Spinbox(opts_card, from_=10, to=600, increment=15, width=6)
-        self.spn_img_frames.set(225)
+        self.spn_img_frames.set(360)  # MẶC ĐỊNH 360 FRAMES
         self.spn_img_frames.grid(row=0, column=3, padx=4, pady=4)
 
         ttk.Label(opts_card, text="FPS:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=4, padx=4, pady=4)
         self.spn_img_fps = ttk.Spinbox(opts_card, from_=5, to=60, increment=1, width=6)
-        self.spn_img_fps.set(15)
+        self.spn_img_fps.set(20)  # MẶC ĐỊNH 20 FPS
         self.spn_img_fps.grid(row=0, column=5, padx=4, pady=4)
 
         btn_action_frame = ttk.Frame(self.tab_image)
@@ -506,19 +487,14 @@ class ProfessionalVideoStudioApp(tk.Tk):
 
     # ================= LOG & STATUS MONITOR UTILS =================
     def log(self, message: str):
-        timestamp = time.strftime("%H:%M:%S")
-        formatted = f"[{timestamp}] {message}\n"
-        self.log_text.insert("end", formatted)
-        self.log_text.see("end")
+        """Hàm ghi log tập trung gửi thẳng tới bảng Status Monitor bên phải."""
+        self.status_log(message)
 
     def status_log(self, message: str):
         timestamp = time.strftime("%H:%M:%S")
         formatted = f"[{timestamp}] {message}\n"
         self.status_log_text.insert("end", formatted)
         self.status_log_text.see("end")
-
-    def clear_general_logs(self):
-        self.log_text.delete("1.0", "end")
 
     def clear_status_logs(self):
         self.status_log_text.delete("1.0", "end")
