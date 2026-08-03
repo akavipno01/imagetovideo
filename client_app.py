@@ -893,6 +893,19 @@ class ProfessionalVideoStudioApp(tk.Tk):
                         save_filename = f"image_{idx:03d}_{safe_title}.png"
 
                         self.wait_and_download_image_only_task(base_url, task_id, save_filename)
+                    elif res.status_code == 404:
+                        self.status_log(f"❌ POST FAILED: HTTP 404 Not Found")
+                        self.status_log(f"⚠️ Server Backend trên Colab đang chạy bản cũ chưa có route /generate-image!")
+                        self.status_log(f"👉 Vui lòng vào Colab chạy: !git pull origin main rồi Restart lại Cell backend.")
+                        self.after(0, lambda: messagebox.showwarning(
+                            "Server Backend Chưa Cập Nhật",
+                            "Server Backend trên Google Colab đang chạy bản cũ chưa cập nhật route /generate-image.\n\n"
+                            "Vui lòng vào Google Colab chạy lệnh:\n!git pull origin main\n\nsau đó RESTART (bấm Dừng rồi Bấm Chạy lại) Cell backend!"
+                        ))
+                        with self.counter_lock:
+                            self.failed_count += 1
+                        self.after(0, self.update_stats_label)
+                        break
                     else:
                         self.status_log(f"❌ POST FAILED: HTTP {res.status_code}")
                         with self.counter_lock:

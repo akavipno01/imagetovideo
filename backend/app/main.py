@@ -111,6 +111,7 @@ def get_runtime():
 
 
 @app.post("/generate-image", status_code=202)
+@app.post("/generate_image", status_code=202)
 def generate_image_only(req: GenerateImageOnlyRequest):
     """API nhận Text Prompt và chỉ khởi chạy tiến trình sinh ảnh AI (không tạo video)."""
     if not req.prompt.strip():
