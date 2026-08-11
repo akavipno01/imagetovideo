@@ -10,7 +10,8 @@ Tính năng mới v4.2:
   Tự động gửi danh sách prompt lên API /generate-image để CHỈ tạo ảnh .png và lưu về thư mục output.
 - Tab 1 ("Text to video"): 2 nút chọn linh hoạt (Render Video hoặc Chỉ Render Ảnh).
 - Tab 2 ("Image to video"): Đặt MẶC ĐỊNH 4 LUỒNG song song (Workers = 4).
-- Mặc định: Frame = 360, FPS = 20 (Độ phân giải 1080 x 720 HD, Random Hiệu Ứng 3D).
+- Mặc định: Thời Lượng = 8s, Frame = 160, FPS = 20 (Độ phân giải 1080 x 720 HD, Random Hiệu Ứng 3D).
+- Thêm Combobox chọn thời lượng video (giây) tự động tính và nhảy số frame tương ứng.
 - Bảng Monitor bên phải (Right Panel) hiển thị Real-time Log các lượt gọi GET /status/{task_id}.
 - Mặc định mở ở chế độ Full Screen maximized.
 ===============================================================================
@@ -65,13 +66,42 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 
 # Danh sách độ phân giải sẵn (Resolution Presets)
 RESOLUTION_PRESETS = {
-    "1080 x 720 (HD - Mặc định)": (1080, 720),
-    "1920 x 1080 (Full HD 1080p)": (1920, 1080),
+    "1376 x 768 (16:9 Widescreen - Mặc định)": (1376, 768),
+    "1920 x 1080 (16:9 Full HD 1080p)": (1920, 1080),
+    "1280 x 720 (16:9 Standard HD)": (1280, 720),
     "1080 x 1080 (Square 1:1)": (1080, 1080),
     "720 x 1280 (Vertical TikTok/Reels)": (720, 1280),
     "512 x 512 (Standard SD)": (512, 512),
-    "Tùy chỉnh (Custom)": (1080, 720),
+    "Tùy chỉnh (Custom)": (1376, 768),
 }
+
+# Danh sách tùy chọn thời lượng video (giây)
+DURATION_OPTIONS = [
+    "2s",
+    "3s",
+    "4s",
+    "5s",
+    "6s",
+    "7s",
+    "8s (Mặc định)",
+    "9s",
+    "10s",
+    "12s",
+    "15s",
+    "18s",
+    "20s",
+    "25s",
+    "30s",
+]
+
+
+def parse_duration_seconds(duration_str: str) -> int:
+    import re
+    match = re.search(r"(\d+)", str(duration_str))
+    if match:
+        return int(match.group(1))
+    return 8
+
 
 
 class ProfessionalVideoStudioApp(tk.Tk):
@@ -377,22 +407,22 @@ class ProfessionalVideoStudioApp(tk.Tk):
         # Hàng 1: Khung Ảnh, Width, Height
         ttk.Label(opts_card, text="📐 Mẫu Khung Ảnh:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", padx=4, pady=4)
 
-        self.preset_var = tk.StringVar(value="1080 x 720 (HD - Mặc định)")
+        self.preset_var = tk.StringVar(value="1376 x 768 (16:9 Widescreen - Mặc định)")
         cmb_preset = ttk.Combobox(opts_card, textvariable=self.preset_var, values=list(RESOLUTION_PRESETS.keys()), state="readonly", width=26)
         cmb_preset.grid(row=0, column=1, padx=4, pady=4)
         cmb_preset.bind("<<ComboboxSelected>>", self.on_resolution_preset_changed)
 
         ttk.Label(opts_card, text="Width:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=2, padx=4, pady=4)
         self.spn_txt_width = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
-        self.spn_txt_width.set(1080)
+        self.spn_txt_width.set(1376)
         self.spn_txt_width.grid(row=0, column=3, padx=4, pady=4)
 
         ttk.Label(opts_card, text="Height:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=4, padx=4, pady=4)
         self.spn_txt_height = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
-        self.spn_txt_height.set(720)
+        self.spn_txt_height.set(768)
         self.spn_txt_height.grid(row=0, column=5, padx=4, pady=4)
 
-        # Hàng 2: Hiệu ứng 3D, Frames, FPS
+        # Hàng 2: Hiệu ứng 3D, Thời lượng (Giây), FPS
         ttk.Label(opts_card, text="🎬 Hiệu Ứng 3D:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", padx=4, pady=4)
 
         self.txt_motion_var = tk.StringVar(value="random")
@@ -401,24 +431,39 @@ class ProfessionalVideoStudioApp(tk.Tk):
             textvariable=self.txt_motion_var,
             values=[v for k, v in MOTION_LABELS.items()],
             state="readonly",
-            width=26,
+            width=24,
         )
         cmb_txt_motion.grid(row=1, column=1, padx=4, pady=4)
         cmb_txt_motion.set(MOTION_LABELS["random"])
 
-        ttk.Label(opts_card, text="Frames:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=2, padx=4, pady=4)
-        self.spn_txt_frames = ttk.Spinbox(opts_card, from_=10, to=600, increment=15, width=5)
-        self.spn_txt_frames.set(360)  # MẶC ĐỊNH 360 FRAMES
-        self.spn_txt_frames.grid(row=1, column=3, padx=4, pady=4)
+        ttk.Label(opts_card, text="⏱️ Thời Lượng:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=2, padx=4, pady=4)
+        self.txt_duration_var = tk.StringVar(value="8s (Mặc định)")
+        cmb_txt_duration = ttk.Combobox(
+            opts_card,
+            textvariable=self.txt_duration_var,
+            values=DURATION_OPTIONS,
+            state="readonly",
+            width=12,
+        )
+        cmb_txt_duration.grid(row=1, column=3, padx=4, pady=4)
+        cmb_txt_duration.bind("<<ComboboxSelected>>", self.on_txt_duration_changed)
 
         ttk.Label(opts_card, text="FPS:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=4, padx=4, pady=4)
-        self.spn_txt_fps = ttk.Spinbox(opts_card, from_=5, to=60, increment=1, width=5)
+        self.spn_txt_fps = ttk.Spinbox(
+            opts_card, from_=5, to=60, increment=1, width=6, command=self.on_txt_duration_changed
+        )
         self.spn_txt_fps.set(20)  # MẶC ĐỊNH 20 FPS
         self.spn_txt_fps.grid(row=1, column=5, padx=4, pady=4)
+        self.spn_txt_fps.bind("<KeyRelease>", lambda e: self.on_txt_duration_changed())
 
-        # Hàng 3: CHECKBOX TẢI KÈM ÁNH AI GỐC (.PNG)
+        # Hàng 3: Số Frame (tự nhảy theo Giây), CHECKBOX TẢI KÈM ÁNH AI GỐC (.PNG)
+        ttk.Label(opts_card, text="🎞️ Số Frame:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", padx=4, pady=4)
+        self.spn_txt_frames = ttk.Spinbox(opts_card, from_=10, to=1200, increment=10, width=10)
+        self.spn_txt_frames.set(160)  # MẶC ĐỊNH 160 FRAMES (8s * 20 FPS)
+        self.spn_txt_frames.grid(row=2, column=1, sticky="w", padx=4, pady=4)
+
         chk_save_img = ttk.Checkbutton(opts_card, text="🖼️ Tải Kèm Ảnh AI Gốc (.png) Khi Render Video", variable=self.chk_txt_save_img_var, style="TCheckbutton")
-        chk_save_img.grid(row=2, column=0, columnspan=6, sticky="w", padx=4, pady=4)
+        chk_save_img.grid(row=2, column=2, columnspan=4, sticky="w", padx=4, pady=4)
 
         btn_action_frame = ttk.Frame(self.tab_text)
         btn_action_frame.pack(fill="x", pady=8)
@@ -438,6 +483,15 @@ class ProfessionalVideoStudioApp(tk.Tk):
         # NÚT 3: DỪNG TIẾN TRÌNH
         self.btn_stop_text = ttk.Button(btn_action_frame, text="⏹️ DỪNG TIẾN TRÌNH", style="Danger.TButton", command=self.request_stop, state="disabled")
         self.btn_stop_text.pack(side="left")
+
+    def on_txt_duration_changed(self, event=None):
+        try:
+            sec = parse_duration_seconds(self.txt_duration_var.get())
+            fps = int(self.spn_txt_fps.get())
+            frames = sec * fps
+            self.spn_txt_frames.set(frames)
+        except Exception:
+            pass
 
     def on_resolution_preset_changed(self, event):
         preset_name = self.preset_var.get()
@@ -479,7 +533,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
         opts_card = ttk.Frame(self.tab_image, style="Card.TFrame", padding=10)
         opts_card.pack(fill="x", pady=6)
 
-        # Hàng 1: Hiệu ứng 3D, Frames, FPS
+        # Hàng 1: Hiệu ứng 3D, Thời lượng (Giây), FPS
         ttk.Label(opts_card, text="🎬 Hiệu Ứng 3D:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", padx=4, pady=4)
 
         self.img_motion_var = tk.StringVar(value="random")
@@ -488,26 +542,50 @@ class ProfessionalVideoStudioApp(tk.Tk):
             textvariable=self.img_motion_var,
             values=[v for k, v in MOTION_LABELS.items()],
             state="readonly",
-            width=26,
+            width=24,
         )
         cmb_img_motion.grid(row=0, column=1, padx=4, pady=4)
         cmb_img_motion.set(MOTION_LABELS["random"])
 
-        ttk.Label(opts_card, text="Frames:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=2, padx=4, pady=4)
-        self.spn_img_frames = ttk.Spinbox(opts_card, from_=10, to=600, increment=15, width=5)
-        self.spn_img_frames.set(360)  # MẶC ĐỊNH 360 FRAMES
-        self.spn_img_frames.grid(row=0, column=3, padx=4, pady=4)
+        ttk.Label(opts_card, text="⏱️ Thời Lượng:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=2, padx=4, pady=4)
+        self.img_duration_var = tk.StringVar(value="8s (Mặc định)")
+        cmb_img_duration = ttk.Combobox(
+            opts_card,
+            textvariable=self.img_duration_var,
+            values=DURATION_OPTIONS,
+            state="readonly",
+            width=12,
+        )
+        cmb_img_duration.grid(row=0, column=3, padx=4, pady=4)
+        cmb_img_duration.bind("<<ComboboxSelected>>", self.on_img_duration_changed)
 
         ttk.Label(opts_card, text="FPS:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=4, padx=4, pady=4)
-        self.spn_img_fps = ttk.Spinbox(opts_card, from_=5, to=60, increment=1, width=5)
+        self.spn_img_fps = ttk.Spinbox(
+            opts_card, from_=5, to=60, increment=1, width=6, command=self.on_img_duration_changed
+        )
         self.spn_img_fps.set(20)  # MẶC ĐỊNH 20 FPS
         self.spn_img_fps.grid(row=0, column=5, padx=4, pady=4)
+        self.spn_img_fps.bind("<KeyRelease>", lambda e: self.on_img_duration_changed())
 
-        # Hàng 2: SỐ LUỒNG (WORKERS) MẶC ĐỊNH 4 LUỒNG CHO TAB IMAGE TO VIDEO
-        ttk.Label(opts_card, text="⚡ Số Luồng (Workers):", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", padx=4, pady=4)
-        self.spn_img_threads = ttk.Spinbox(opts_card, from_=1, to=4, increment=1, width=5)
+        # Hàng 2: Số Frame (tự nhảy theo Giây), SỐ LUỒNG (WORKERS)
+        ttk.Label(opts_card, text="🎞️ Số Frame:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", padx=4, pady=4)
+        self.spn_img_frames = ttk.Spinbox(opts_card, from_=10, to=1200, increment=10, width=10)
+        self.spn_img_frames.set(160)  # MẶC ĐỊNH 160 FRAMES (8s * 20 FPS)
+        self.spn_img_frames.grid(row=1, column=1, sticky="w", padx=4, pady=4)
+
+        ttk.Label(opts_card, text="⚡ Số Luồng (Workers):", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=2, sticky="w", padx=4, pady=4)
+        self.spn_img_threads = ttk.Spinbox(opts_card, from_=1, to=4, increment=1, width=6)
         self.spn_img_threads.set(4)  # MẶC ĐỊNH 4 LUỒNG CHO IMAGE TO VIDEO
-        self.spn_img_threads.grid(row=1, column=1, sticky="w", padx=4, pady=4)
+        self.spn_img_threads.grid(row=1, column=3, sticky="w", padx=4, pady=4)
+
+    def on_img_duration_changed(self, event=None):
+        try:
+            sec = parse_duration_seconds(self.img_duration_var.get())
+            fps = int(self.spn_img_fps.get())
+            frames = sec * fps
+            self.spn_img_frames.set(frames)
+        except Exception:
+            pass
 
         btn_action_frame = ttk.Frame(self.tab_image)
         btn_action_frame.pack(fill="x", pady=8)
@@ -638,10 +716,15 @@ class ProfessionalVideoStudioApp(tk.Tk):
         return False
 
     # ================= PIPELINE XỬ LÝ TÁC VỤ & REAL-TIME STATUS LOGGING =================
-    def wait_and_download_task(self, base_url: str, task_id: str, save_filename: str) -> bool:
+    def wait_and_download_task(
+        self, base_url: str, task_id: str, save_filename: str, custom_output_dir: Optional[Path] = None
+    ) -> bool:
         status_url = f"{base_url}/status/{task_id}"
         download_url = f"{base_url}/download/{task_id}"
-        out_dir = Path(self.output_dir_var.get().strip())
+        if custom_output_dir is not None:
+            out_dir = Path(custom_output_dir)
+        else:
+            out_dir = Path(self.output_dir_var.get().strip())
         out_dir.mkdir(parents=True, exist_ok=True)
         dest_path = out_dir / save_filename
 
@@ -983,9 +1066,9 @@ class ProfessionalVideoStudioApp(tk.Tk):
                 if res.status_code == 202:
                     task_id = res.json().get("task_id")
                     self.status_log(f"✅ POST 202 Accepted | Task ID: {task_id}")
-                    save_filename = f"img_{idx:03d}_{img_file.stem}_{effect}.mp4"
+                    save_filename = f"{img_file.stem}.mp4"
 
-                    self.wait_and_download_task(base_url, task_id, save_filename)
+                    self.wait_and_download_task(base_url, task_id, save_filename, custom_output_dir=img_file.parent)
                 else:
                     self.status_log(f"❌ POST BASE64 FAILED: HTTP {res.status_code}")
                     with self.counter_lock:

@@ -57,8 +57,8 @@ app.add_middleware(
 class GenerateRequest(BaseModel):
     prompt: str = Field(..., description="Văn bản mô tả nội dung cần tạo ảnh và video", example="A futuristic neon city at sunset, 4k hyperrealistic")
     negative_prompt: str = Field("", description="Các chi tiết không mong muốn trong ảnh", example="blurry, bad quality, distortion")
-    width: int = Field(512, ge=256, le=2048, description="Chiều rộng ảnh")
-    height: int = Field(512, ge=256, le=2048, description="Chiều cao ảnh")
+    width: int = Field(1376, ge=256, le=2048, description="Chiều rộng ảnh")
+    height: int = Field(768, ge=256, le=2048, description="Chiều cao ảnh")
     num_inference_steps: int = Field(20, ge=1, le=100, description="Số bước khuếch tán sinh ảnh Stable Diffusion")
     motion_type: str = Field("zoom_in", description="Hiệu ứng chuyển động camera 3D: zoom_in, zoom_out, pan_left, pan_right, 3d_parallax, circle_orbit")
     num_frames: int = Field(30, ge=10, le=600, description="Tổng số khung hình cho video")
@@ -71,13 +71,15 @@ class ImageToVideoRequest(BaseModel):
     num_frames: int = Field(30, ge=10, le=600, description="Tổng số khung hình cho video")
     fps: int = Field(15, ge=5, le=60, description="Tốc độ khung hình (khung hình / giây)")
     prompt: Optional[str] = Field("Base64 Image Video Task", description="Mô tả hoặc tiêu đề cho tác vụ")
+    width: Optional[int] = Field(None, ge=256, le=2048, description="Chiều rộng video đầu ra (nếu bỏ trống sẽ lấy theo ảnh gốc)")
+    height: Optional[int] = Field(None, ge=256, le=2048, description="Chiều cao video đầu ra (nếu bỏ trống sẽ lấy theo ảnh gốc)")
 
 
 class GenerateImageOnlyRequest(BaseModel):
     prompt: str = Field(..., description="Văn bản mô tả ảnh cần sinh AI (Chỉ tạo ảnh, không dựng video)", example="A hyperrealistic cybernetic tiger in a futuristic forest")
     negative_prompt: str = Field("", description="Các chi tiết không mong muốn trong ảnh", example="blurry, low quality")
-    width: int = Field(1080, ge=256, le=2048, description="Chiều rộng ảnh")
-    height: int = Field(720, ge=256, le=2048, description="Chiều cao ảnh")
+    width: int = Field(1376, ge=256, le=2048, description="Chiều rộng ảnh")
+    height: int = Field(768, ge=256, le=2048, description="Chiều cao ảnh")
     num_inference_steps: int = Field(25, ge=1, le=100, description="Số bước khuếch tán sinh ảnh Stable Diffusion")
 
 
@@ -199,9 +201,12 @@ def generate_video_from_base64_image(req: ImageToVideoRequest):
     try:
         image_bytes = base64.b64decode(base64_str)
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        width, height = img.size
+        orig_w, orig_h = img.size
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Dữ liệu ảnh Base64 không hợp lệ: {str(exc)}")
+
+    width = req.width if req.width is not None else orig_w
+    height = req.height if req.height is not None else orig_h
 
     task_id = str(uuid.uuid4())
     image_filename = f"{task_id}.png"
@@ -228,6 +233,8 @@ def generate_video_from_base64_image(req: ImageToVideoRequest):
         motion_type=req.motion_type,
         num_frames=req.num_frames,
         fps=req.fps,
+        width=width,
+        height=height,
     )
 
     return {

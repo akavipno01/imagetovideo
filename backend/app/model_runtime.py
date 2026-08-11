@@ -267,6 +267,8 @@ def process_image_to_video_task(
     motion_type: str = "zoom_in",
     num_frames: int = 30,
     fps: int = 15,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
 ) -> None:
     """Tiến trình chạy ngầm nhận file ảnh tải lên và dựng video hiệu ứng 3D."""
     try:
@@ -299,6 +301,8 @@ def process_image_to_video_task(
             motion_type=motion_type,
             num_frames=num_frames,
             fps=fps,
+            target_width=width,
+            target_height=height,
             progress_callback=video_progress_cb,
         )
 
@@ -328,6 +332,8 @@ def dispatch_image_to_video_task(
     motion_type: str = "zoom_in",
     num_frames: int = 30,
     fps: int = 15,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
 ) -> None:
     _executor.submit(
         process_image_to_video_task,
@@ -336,6 +342,8 @@ def dispatch_image_to_video_task(
         motion_type,
         num_frames,
         fps,
+        width,
+        height,
     )
 
 
@@ -343,8 +351,8 @@ def process_image_only_task(
     task_id: str,
     prompt: str,
     negative_prompt: str = "",
-    width: int = 1080,
-    height: int = 720,
+    width: int = 1376,
+    height: int = 768,
     num_inference_steps: int = 25,
 ):
     """Tiến trình sinh ảnh AI từ văn bản (chỉ tạo ảnh .png, không dựng video)."""
@@ -410,8 +418,8 @@ def dispatch_image_only_task(
     task_id: str,
     prompt: str,
     negative_prompt: str = "",
-    width: int = 1080,
-    height: int = 720,
+    width: int = 1376,
+    height: int = 768,
     num_inference_steps: int = 25,
 ) -> None:
     _executor.submit(

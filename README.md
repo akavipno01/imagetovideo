@@ -84,8 +84,8 @@ Server sẽ chạy mặc định tại: `http://127.0.0.1:3930`
 {
   "prompt": "A hyperrealistic cybernetic tiger in a futuristic forest",
   "negative_prompt": "blurry, low quality",
-  "width": 1080,
-  "height": 720,
+  "width": 1376,
+  "height": 768,
   "num_inference_steps": 25
 }
 ```
