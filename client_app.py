@@ -930,6 +930,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
                     "num_frames": num_frames,
                     "fps": fps,
                     "motion_type": effect,
+                    "num_inference_steps": 9,
                 }
 
                 try:
@@ -1002,7 +1003,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
                     "prompt": prompt,
                     "width": width,
                     "height": height,
-                    "num_inference_steps": 25,
+                    "num_inference_steps": 9,
                 }
 
                 try:

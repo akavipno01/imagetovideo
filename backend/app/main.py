@@ -59,7 +59,7 @@ class GenerateRequest(BaseModel):
     negative_prompt: str = Field("", description="Các chi tiết không mong muốn trong ảnh", example="blurry, bad quality, distortion")
     width: int = Field(1376, ge=256, le=2048, description="Chiều rộng ảnh")
     height: int = Field(768, ge=256, le=2048, description="Chiều cao ảnh")
-    num_inference_steps: int = Field(20, ge=1, le=100, description="Số bước khuếch tán sinh ảnh Stable Diffusion")
+    num_inference_steps: int = Field(9, ge=1, le=100, description="Số bước khuếch tán sinh ảnh Z-Image-Turbo / SD")
     motion_type: str = Field("zoom_in", description="Hiệu ứng chuyển động camera 3D: zoom_in, zoom_out, pan_left, pan_right, 3d_parallax, circle_orbit")
     num_frames: int = Field(30, ge=10, le=2400, description="Tổng số khung hình cho video")
     fps: int = Field(15, ge=5, le=60, description="Tốc độ khung hình (khung hình / giây)")
@@ -80,7 +80,7 @@ class GenerateImageOnlyRequest(BaseModel):
     negative_prompt: str = Field("", description="Các chi tiết không mong muốn trong ảnh", example="blurry, low quality")
     width: int = Field(1376, ge=256, le=2048, description="Chiều rộng ảnh")
     height: int = Field(768, ge=256, le=2048, description="Chiều cao ảnh")
-    num_inference_steps: int = Field(25, ge=1, le=100, description="Số bước khuếch tán sinh ảnh Stable Diffusion")
+    num_inference_steps: int = Field(9, ge=1, le=100, description="Số bước khuếch tán sinh ảnh Z-Image-Turbo / SD")
 
 
 @app.get("/")

@@ -249,7 +249,7 @@ def process_generation_task(
     negative_prompt: str = "",
     width: int = 512,
     height: int = 512,
-    num_inference_steps: int = 20,
+    num_inference_steps: int = 9,
     motion_type: str = "zoom_in",
     num_frames: int = 30,
     fps: int = 15,
@@ -276,7 +276,7 @@ def process_generation_task(
         if pipe is not None:
             import torch
             if model_type == "z_image_turbo":
-                turbo_steps = 9 if num_inference_steps >= 15 else max(4, num_inference_steps)
+                turbo_steps = max(4, min(12, num_inference_steps)) if num_inference_steps else 9
                 update_task_progress(
                     task_id,
                     status="generating_image",
@@ -382,7 +382,7 @@ def dispatch_generation_task(
     negative_prompt: str = "",
     width: int = 512,
     height: int = 512,
-    num_inference_steps: int = 20,
+    num_inference_steps: int = 9,
     motion_type: str = "zoom_in",
     num_frames: int = 30,
     fps: int = 15,
@@ -493,7 +493,7 @@ def process_image_only_task(
     negative_prompt: str = "",
     width: int = 1376,
     height: int = 768,
-    num_inference_steps: int = 25,
+    num_inference_steps: int = 9,
 ):
     """Tiến trình sinh ảnh AI từ văn bản (chỉ tạo ảnh .png, không dựng video)."""
     try:
@@ -516,7 +516,7 @@ def process_image_only_task(
         if pipe is not None:
             import torch
             if model_type == "z_image_turbo":
-                turbo_steps = 9 if num_inference_steps >= 15 else max(4, num_inference_steps)
+                turbo_steps = max(4, min(12, num_inference_steps)) if num_inference_steps else 9
                 update_task_progress(
                     task_id,
                     status="generating_image",
@@ -590,7 +590,7 @@ def dispatch_image_only_task(
     negative_prompt: str = "",
     width: int = 1376,
     height: int = 768,
-    num_inference_steps: int = 25,
+    num_inference_steps: int = 9,
 ) -> None:
     _executor.submit(
         process_image_only_task,
