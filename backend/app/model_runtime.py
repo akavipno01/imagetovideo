@@ -83,7 +83,7 @@ def get_pipeline():
                 gc.collect()
                 torch.cuda.empty_cache()
 
-                print("Đang nạp mô hình siêu tốc Z-Image-Turbo...")
+                print("🚀 Đang nạp mô hình Z-Image-Turbo (GGUF DiT + Qwen 4-bit) chuẩn MiAI...")
                 try:
                     from transformers import Qwen3Model
                 except ImportError:
@@ -95,54 +95,49 @@ def get_pipeline():
                     ZImageTransformer2DModel,
                 )
 
-                # Kiểm tra ưu tiên đường dẫn đã tải sẵn trên Colab
-                model_source = DEFAULT_Z_IMAGE_MODEL
-                if LOCAL_Z_IMAGE_DIR.is_dir():
-                    model_source = str(LOCAL_Z_IMAGE_DIR)
-                    print(f"📁 Sử dụng mô hình Z-Image-Turbo đã tải sẵn tại local: {model_source}")
-                elif (MODELS_DIR / "Z-Image-Turbo").is_dir():
-                    model_source = str(MODELS_DIR / "Z-Image-Turbo")
-                    print(f"📁 Sử dụng mô hình Z-Image-Turbo đã tải sẵn tại: {model_source}")
-
+                model_id = DEFAULT_Z_IMAGE_MODEL  # "Tongyi-MAI/Z-Image-Turbo"
                 gguf_source = DEFAULT_Z_IMAGE_GGUF_URL
                 if LOCAL_Z_IMAGE_GGUF.is_file():
                     gguf_source = str(LOCAL_Z_IMAGE_GGUF)
-                    print(f"📁 Sử dụng file GGUF DiT đã tải sẵn tại local: {gguf_source}")
+                    print(f"📁 Sử dụng file GGUF DiT đã tải sẵn: {gguf_source}")
                 elif (MODELS_DIR / "z-image-turbo-Q4_K_M.gguf").is_file():
                     gguf_source = str(MODELS_DIR / "z-image-turbo-Q4_K_M.gguf")
-                    print(f"📁 Sử dụng file GGUF DiT đã tải sẵn tại: {gguf_source}")
+                    print(f"📁 Sử dụng file GGUF DiT đã tải sẵn: {gguf_source}")
 
-                # Nạp Text Encoder 4-bit
+                # 1. Nạp Text Encoder Qwen 4B
+                print(f"1️⃣ Đang nạp Text Encoder từ {model_id}...")
                 bnb_config = BitsAndBytesConfig(
                     load_in_4bit=True,
                     bnb_4bit_quant_type="nf4",
                     bnb_4bit_compute_dtype=torch.bfloat16,
                     bnb_4bit_use_double_quant=True,
                 )
-
-                print(f"- Đang nạp Text Encoder từ {model_source}...")
                 text_encoder = Qwen3Model.from_pretrained(
-                    model_source,
+                    model_id,
                     subfolder="text_encoder",
                     quantization_config=bnb_config,
                     torch_dtype=torch.bfloat16,
                 )
+
+                # 2. Nạp Tokenizer
+                print(f"2️⃣ Đang nạp Tokenizer từ {model_id}...")
                 tokenizer = Qwen2Tokenizer.from_pretrained(
-                    model_source,
+                    model_id,
                     subfolder="tokenizer",
                 )
 
-                # Nạp DiT Transformer từ GGUF Unsloth
-                print(f"- Đang nạp DiT Transformer GGUF từ {gguf_source}...")
+                # 3. Nạp Transformer DiT từ GGUF Unsloth
+                print(f"3️⃣ Đang nạp DiT Transformer GGUF từ {gguf_source}...")
                 transformer = ZImageTransformer2DModel.from_single_file(
                     gguf_source,
                     quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16),
                     torch_dtype=torch.bfloat16,
                 )
 
-                # Khởi tạo ZImagePipeline
+                # 4. Khởi tạo ZImagePipeline
+                print(f"4️⃣ Khởi tạo ZImagePipeline hoàn chỉnh...")
                 pipe = ZImagePipeline.from_pretrained(
-                    model_source,
+                    model_id,
                     text_encoder=text_encoder,
                     tokenizer=tokenizer,
                     transformer=transformer,
@@ -156,11 +151,14 @@ def get_pipeline():
                 _state["status"] = "loaded"
                 _state["device"] = "cuda"
                 _state["model_type"] = "z_image_turbo"
-                _state["model_id"] = model_source
-                print("🎉 Z-Image-Turbo Pipeline nạp thành công trên GPU!")
+                _state["model_id"] = model_id
+                print("🎉 Z-Image-Turbo Pipeline đã nạp thành công 100% trên GPU!")
                 return _pipeline
             except Exception as e:
-                print(f"Không thể nạp Z-Image-Turbo ({e}). Thử chuyển sang Stable Diffusion fallback...")
+                import traceback
+                print(f"❌ LỖI NẠP Z-Image-Turbo: {e}")
+                traceback.print_exc()
+                print("⚠️ Thử chuyển sang Stable Diffusion fallback...")
 
         # =========================================================================
         # 2. Thử nghiệm nạp Stable Diffusion (SD 1.5 / SDXL)
