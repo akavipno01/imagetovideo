@@ -16,8 +16,17 @@ SD_MODEL_DIR = MODELS_DIR / "stable-diffusion"
 
 DB_PATH = DATA_DIR / "text-to-video.sqlite3"
 DEFAULT_SD_MODEL = os.environ.get("SD_MODEL_ID", "runwayml/stable-diffusion-v1-5")
+DEFAULT_Z_IMAGE_MODEL = os.environ.get("Z_IMAGE_MODEL_ID", "Tongyi-MAI/Z-Image-Turbo")
+DEFAULT_Z_IMAGE_GGUF_URL = os.environ.get(
+    "Z_IMAGE_GGUF_URL",
+    "https://huggingface.co/unsloth/Z-Image-Turbo-GGUF/blob/main/z-image-turbo-Q4_K_M.gguf",
+)
+LOCAL_Z_IMAGE_DIR = Path(os.environ.get("Z_IMAGE_MODEL_PATH", "/content/models/Z-Image-Turbo"))
+LOCAL_Z_IMAGE_GGUF = Path(os.environ.get("Z_IMAGE_GGUF_PATH", "/content/models/z-image-turbo-Q4_K_M.gguf"))
+
 
 
 def ensure_directories() -> None:
     for directory in (DATA_DIR, OUTPUTS_DIR, IMAGES_DIR, VIDEOS_DIR, TEMP_DIR, MODELS_DIR, SD_MODEL_DIR):
         directory.mkdir(parents=True, exist_ok=True)
+
