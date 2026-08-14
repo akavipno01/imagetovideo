@@ -21,10 +21,12 @@ from .database import (
     initialize_database,
     list_tasks,
 )
+import threading
 from .model_runtime import (
     dispatch_generation_task,
     dispatch_image_only_task,
     dispatch_image_to_video_task,
+    get_pipeline,
     runtime_state,
 )
 
@@ -33,6 +35,8 @@ from .model_runtime import (
 async def lifespan(_: FastAPI):
     ensure_directories()
     initialize_database()
+    # Nạp trước Model AI vào GPU ngay khi server khởi động
+    threading.Thread(target=get_pipeline, daemon=True).start()
     print(f"=== {APP_NAME} is ready! ===")
     yield
 
