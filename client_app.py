@@ -822,7 +822,17 @@ class ProfessionalVideoStudioApp(tk.Tk):
         dest_path = out_dir / save_filename
 
         self.after(0, lambda: self.active_task_id_var.set(task_id[:12] + "..."))
-        self.status_log(f"▶️ BẮT ĐẦU MONITOR TASK ÁNH: {task_id}")
+        self.status_log(f"▶️ BẮT ĐẦU MONITOR TASK ẢNH: {task_id}")
+        self.status_log(f"⏳ Chờ 20 giây cho server hoàn tất tạo ảnh AI trước khi gọi status...")
+
+        # Chờ 20 giây trước khi bắt đầu gọi status
+        for sec in range(20, 0, -1):
+            if self.stop_requested:
+                self.status_log(f"⏹️ TASK STOPPED BY USER: {task_id[:8]}")
+                return False
+            self.after(0, lambda s=sec: self.active_task_status_var.set(f"Đang sinh ảnh AI (chờ {s}s)..."))
+            self.after(0, lambda s=sec: self.update_status(f"Đang sinh ảnh AI (chờ {s}s)..."))
+            time.sleep(1.0)
 
         while not self.stop_requested:
             try:
@@ -868,7 +878,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
                         self.after(0, self.update_stats_label)
                         return False
 
-                time.sleep(2.0)
+                time.sleep(10.0)
             except Exception as e:
                 self.status_log(f"⚠️ RETRY POLLING ({task_id[:8]}): {e}")
                 time.sleep(3.0)
