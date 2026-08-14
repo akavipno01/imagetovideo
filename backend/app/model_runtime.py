@@ -262,9 +262,9 @@ def process_generation_task(
             detail=f"Đang sinh ảnh từ text prompt: '{prompt[:30]}...' (0%)",
         )
 
-        # Sanitize width & height to be multiples of 8 and within safe limits
-        width = max(256, (int(width) // 8) * 8)
-        height = max(256, (int(height) // 8) * 8)
+        # Sanitize width & height to be multiples of 16 and within safe limits
+        width = max(256, min(1536, (int(width) // 16) * 16))
+        height = max(256, min(1536, (int(height) // 16) * 16))
 
         pipe = get_pipeline()
         image_filename = f"{task_id}.png"
@@ -279,8 +279,10 @@ def process_generation_task(
                     task_id,
                     status="generating_image",
                     progress=25.0,
-                    detail=f"Đang sinh ảnh siêu nét Z-Image-Turbo ({turbo_steps} steps)...",
+                    detail=f"Đang sinh ảnh siêu nét Z-Image-Turbo ({turbo_steps} steps, {width}x{height})...",
                 )
+                seed = random.randint(1, 2147483647)
+                generator = torch.Generator("cuda").manual_seed(seed)
                 with torch.inference_mode():
                     res = pipe(
                         prompt=prompt,
@@ -288,7 +290,7 @@ def process_generation_task(
                         width=width,
                         num_inference_steps=turbo_steps,
                         guidance_scale=0.0,
-                        generator=torch.Generator("cuda"),
+                        generator=generator,
                         num_images_per_prompt=1,
                     )
                 image = res.images[0]
@@ -502,9 +504,9 @@ def process_image_only_task(
             detail=f"Đang sinh ảnh AI từ prompt: '{prompt[:30]}...' (0%)",
         )
 
-        # Sanitize width & height to be multiples of 8 and within safe limits
-        width = max(256, (int(width) // 8) * 8)
-        height = max(256, (int(height) // 8) * 8)
+        # Sanitize width & height to be multiples of 16 and within safe limits
+        width = max(256, min(1536, (int(width) // 16) * 16))
+        height = max(256, min(1536, (int(height) // 16) * 16))
 
         pipe = get_pipeline()
         image_filename = f"{task_id}.png"
@@ -519,8 +521,10 @@ def process_image_only_task(
                     task_id,
                     status="generating_image",
                     progress=40.0,
-                    detail=f"Đang sinh ảnh siêu nét Z-Image-Turbo ({turbo_steps} steps)...",
+                    detail=f"Đang sinh ảnh siêu nét Z-Image-Turbo ({turbo_steps} steps, {width}x{height})...",
                 )
+                seed = random.randint(1, 2147483647)
+                generator = torch.Generator("cuda").manual_seed(seed)
                 with torch.inference_mode():
                     res = pipe(
                         prompt=prompt,
@@ -528,7 +532,7 @@ def process_image_only_task(
                         width=width,
                         num_inference_steps=turbo_steps,
                         guidance_scale=0.0,
-                        generator=torch.Generator("cuda"),
+                        generator=generator,
                         num_images_per_prompt=1,
                     )
                 image = res.images[0]

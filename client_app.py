@@ -66,13 +66,15 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 
 # Danh sách độ phân giải sẵn (Resolution Presets)
 RESOLUTION_PRESETS = {
-    "1376 x 768 (16:9 Widescreen - Mặc định)": (1376, 768),
-    "1920 x 1080 (16:9 Full HD 1080p)": (1920, 1080),
+    "1024 x 576 (16:9 Widescreen - Mặc định)": (1024, 576),
+    "512 x 512 (1:1 Chuẩn MiAI)": (512, 512),
+    "768 x 768 (1:1 Vuông Chi Tiết)": (768, 768),
+    "1024 x 1024 (1:1 Vuông Sắc Nét)": (1024, 1024),
+    "576 x 1024 (9:16 Dọc TikTok/Reels)": (576, 1024),
     "1280 x 720 (16:9 Standard HD)": (1280, 720),
-    "1080 x 1080 (Square 1:1)": (1080, 1080),
-    "720 x 1280 (Vertical TikTok/Reels)": (720, 1280),
-    "512 x 512 (Standard SD)": (512, 512),
-    "Tùy chỉnh (Custom)": (1376, 768),
+    "1376 x 768 (16:9 Rộng)": (1376, 768),
+    "1920 x 1080 (16:9 Full HD 1080p)": (1920, 1080),
+    "Tùy chỉnh (Custom)": (1024, 576),
 }
 
 # Danh sách tùy chọn thời lượng video (giây)
@@ -411,19 +413,19 @@ class ProfessionalVideoStudioApp(tk.Tk):
         # Hàng 1: Khung Ảnh, Width, Height
         ttk.Label(opts_card, text="📐 Mẫu Khung Ảnh:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", padx=4, pady=4)
 
-        self.preset_var = tk.StringVar(value="1376 x 768 (16:9 Widescreen - Mặc định)")
-        cmb_preset = ttk.Combobox(opts_card, textvariable=self.preset_var, values=list(RESOLUTION_PRESETS.keys()), state="readonly", width=26)
+        self.preset_var = tk.StringVar(value="1024 x 576 (16:9 Widescreen - Mặc định)")
+        cmb_preset = ttk.Combobox(opts_card, textvariable=self.preset_var, values=list(RESOLUTION_PRESETS.keys()), state="readonly", width=28)
         cmb_preset.grid(row=0, column=1, padx=4, pady=4)
         cmb_preset.bind("<<ComboboxSelected>>", self.on_resolution_preset_changed)
 
         ttk.Label(opts_card, text="Width:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=2, padx=4, pady=4)
         self.spn_txt_width = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
-        self.spn_txt_width.set(1376)
+        self.spn_txt_width.set(1024)
         self.spn_txt_width.grid(row=0, column=3, padx=4, pady=4)
 
         ttk.Label(opts_card, text="Height:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=4, padx=4, pady=4)
         self.spn_txt_height = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
-        self.spn_txt_height.set(768)
+        self.spn_txt_height.set(576)
         self.spn_txt_height.grid(row=0, column=5, padx=4, pady=4)
 
         # Hàng 2: Hiệu ứng 3D, Thời lượng (Giây), FPS
@@ -547,19 +549,19 @@ class ProfessionalVideoStudioApp(tk.Tk):
         # Hàng 1: Khung Ảnh, Width, Height (Mặc định 1376x768 16:9 Widescreen)
         ttk.Label(opts_card, text="📐 Mẫu Khung Ảnh:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", padx=4, pady=4)
 
-        self.img_preset_var = tk.StringVar(value="1376 x 768 (16:9 Widescreen - Mặc định)")
-        cmb_img_preset = ttk.Combobox(opts_card, textvariable=self.img_preset_var, values=list(RESOLUTION_PRESETS.keys()), state="readonly", width=26)
+        self.img_preset_var = tk.StringVar(value="1024 x 576 (16:9 Widescreen - Mặc định)")
+        cmb_img_preset = ttk.Combobox(opts_card, textvariable=self.img_preset_var, values=list(RESOLUTION_PRESETS.keys()), state="readonly", width=28)
         cmb_img_preset.grid(row=0, column=1, padx=4, pady=4)
         cmb_img_preset.bind("<<ComboboxSelected>>", self.on_img_resolution_preset_changed)
 
         ttk.Label(opts_card, text="Width:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=2, padx=4, pady=4)
         self.spn_img_width = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
-        self.spn_img_width.set(1376)
+        self.spn_img_width.set(1024)
         self.spn_img_width.grid(row=0, column=3, padx=4, pady=4)
 
         ttk.Label(opts_card, text="Height:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=4, padx=4, pady=4)
         self.spn_img_height = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
-        self.spn_img_height.set(768)
+        self.spn_img_height.set(576)
         self.spn_img_height.grid(row=0, column=5, padx=4, pady=4)
 
         # Hàng 2: Hiệu ứng 3D, Thời lượng (Giây), FPS
