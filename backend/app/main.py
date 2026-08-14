@@ -61,14 +61,14 @@ class GenerateRequest(BaseModel):
     height: int = Field(768, ge=256, le=2048, description="Chiều cao ảnh")
     num_inference_steps: int = Field(20, ge=1, le=100, description="Số bước khuếch tán sinh ảnh Stable Diffusion")
     motion_type: str = Field("zoom_in", description="Hiệu ứng chuyển động camera 3D: zoom_in, zoom_out, pan_left, pan_right, 3d_parallax, circle_orbit")
-    num_frames: int = Field(30, ge=10, le=600, description="Tổng số khung hình cho video")
+    num_frames: int = Field(30, ge=10, le=2400, description="Tổng số khung hình cho video")
     fps: int = Field(15, ge=5, le=60, description="Tốc độ khung hình (khung hình / giây)")
 
 
 class ImageToVideoRequest(BaseModel):
     image_base64: str = Field(..., description="Dữ liệu ảnh dạng chuỗi Base64 (hỗ trợ cả dạng raw base64 hoặc data:image/png;base64,...)", example="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
     motion_type: str = Field("zoom_in", description="Hiệu ứng chuyển động camera 3D: zoom_in, zoom_out, pan_left, pan_right, 3d_parallax, circle_orbit")
-    num_frames: int = Field(30, ge=10, le=600, description="Tổng số khung hình cho video")
+    num_frames: int = Field(30, ge=10, le=2400, description="Tổng số khung hình cho video")
     fps: int = Field(15, ge=5, le=60, description="Tốc độ khung hình (khung hình / giây)")
     prompt: Optional[str] = Field("Base64 Image Video Task", description="Mô tả hoặc tiêu đề cho tác vụ")
     width: Optional[int] = Field(None, ge=256, le=2048, description="Chiều rộng video đầu ra (nếu bỏ trống sẽ lấy theo ảnh gốc)")

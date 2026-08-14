@@ -80,6 +80,14 @@ def get_pipeline():
             pipeline.to(device)
             if device == "cuda":
                 pipeline.enable_attention_slicing()
+                try:
+                    pipeline.enable_vae_slicing()
+                except Exception:
+                    pass
+                try:
+                    pipeline.enable_vae_tiling()
+                except Exception:
+                    pass
             
             _pipeline = pipeline
             _state["status"] = "loaded"
@@ -154,11 +162,16 @@ def process_generation_task(
             detail=f"Đang sinh ảnh từ text prompt: '{prompt[:30]}...' (0%)",
         )
 
+        # Sanitize width & height to be multiples of 8 and within safe limits
+        width = max(256, (int(width) // 8) * 8)
+        height = max(256, (int(height) // 8) * 8)
+
         pipe = get_pipeline()
         image_filename = f"{task_id}.png"
         image_path = IMAGES_DIR / image_filename
 
         if pipe is not None:
+            import torch
             # Sinh ảnh bằng PyTorch Diffusers pipeline
             def step_callback(step: int, timestep: int, latents: Any):
                 prog = 10.0 + (step / max(1, num_inference_steps)) * 40.0
@@ -169,16 +182,19 @@ def process_generation_task(
                     detail=f"Đang sinh ảnh AI... Bước {step}/{num_inference_steps}",
                 )
 
-            res = pipe(
-                prompt=prompt,
-                negative_prompt=negative_prompt if negative_prompt else None,
-                width=width,
-                height=height,
-                num_inference_steps=num_inference_steps,
-                callback=step_callback,
-                callback_steps=max(1, num_inference_steps // 5),
-            )
+            with torch.inference_mode():
+                res = pipe(
+                    prompt=prompt,
+                    negative_prompt=negative_prompt if negative_prompt else None,
+                    width=width,
+                    height=height,
+                    num_inference_steps=num_inference_steps,
+                    callback=step_callback,
+                    callback_steps=max(1, num_inference_steps // 5),
+                )
             image = res.images[0]
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
         else:
             # Fallback canvas khi chưa có weights hoặc test local CPU
             time.sleep(1.0)
@@ -364,11 +380,16 @@ def process_image_only_task(
             detail=f"Đang sinh ảnh AI từ prompt: '{prompt[:30]}...' (0%)",
         )
 
+        # Sanitize width & height to be multiples of 8 and within safe limits
+        width = max(256, (int(width) // 8) * 8)
+        height = max(256, (int(height) // 8) * 8)
+
         pipe = get_pipeline()
         image_filename = f"{task_id}.png"
         image_path = IMAGES_DIR / image_filename
 
         if pipe is not None:
+            import torch
             def step_callback(step: int, timestep: int, latents: Any):
                 prog = 10.0 + (step / max(1, num_inference_steps)) * 85.0
                 update_task_progress(
@@ -378,16 +399,19 @@ def process_image_only_task(
                     detail=f"Đang sinh ảnh AI... Bước {step}/{num_inference_steps}",
                 )
 
-            res = pipe(
-                prompt=prompt,
-                negative_prompt=negative_prompt if negative_prompt else None,
-                width=width,
-                height=height,
-                num_inference_steps=num_inference_steps,
-                callback=step_callback,
-                callback_steps=max(1, num_inference_steps // 5),
-            )
+            with torch.inference_mode():
+                res = pipe(
+                    prompt=prompt,
+                    negative_prompt=negative_prompt if negative_prompt else None,
+                    width=width,
+                    height=height,
+                    num_inference_steps=num_inference_steps,
+                    callback=step_callback,
+                    callback_steps=max(1, num_inference_steps // 5),
+                )
             image = res.images[0]
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
         else:
             time.sleep(1.0)
             image = generate_fallback_image(prompt, width, height)

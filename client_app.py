@@ -92,6 +92,10 @@ DURATION_OPTIONS = [
     "20s",
     "25s",
     "30s",
+    "35s",
+    "40s",
+    "45s",
+    "60s",
 ]
 
 
@@ -458,7 +462,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
 
         # Hàng 3: Số Frame (tự nhảy theo Giây), CHECKBOX TẢI KÈM ÁNH AI GỐC (.PNG)
         ttk.Label(opts_card, text="🎞️ Số Frame:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", padx=4, pady=4)
-        self.spn_txt_frames = ttk.Spinbox(opts_card, from_=10, to=1200, increment=10, width=10)
+        self.spn_txt_frames = ttk.Spinbox(opts_card, from_=10, to=2400, increment=10, width=10)
         self.spn_txt_frames.set(160)  # MẶC ĐỊNH 160 FRAMES (8s * 20 FPS)
         self.spn_txt_frames.grid(row=2, column=1, sticky="w", padx=4, pady=4)
 
@@ -500,6 +504,13 @@ class ProfessionalVideoStudioApp(tk.Tk):
             self.spn_txt_width.set(w)
             self.spn_txt_height.set(h)
 
+    def on_img_resolution_preset_changed(self, event):
+        preset_name = self.img_preset_var.get()
+        if preset_name in RESOLUTION_PRESETS:
+            w, h = RESOLUTION_PRESETS[preset_name]
+            self.spn_img_width.set(w)
+            self.spn_img_height.set(h)
+
     # ================= TAB 2: IMAGE TO VIDEO SETUP =================
     def setup_tab_image(self):
         lbl = ttk.Label(self.tab_image, text="Chọn Thư Mục Chứa Ảnh để Render Video (Base64 Mode):", style="Section.TLabel")
@@ -533,8 +544,26 @@ class ProfessionalVideoStudioApp(tk.Tk):
         opts_card = ttk.Frame(self.tab_image, style="Card.TFrame", padding=10)
         opts_card.pack(fill="x", pady=6)
 
-        # Hàng 1: Hiệu ứng 3D, Thời lượng (Giây), FPS
-        ttk.Label(opts_card, text="🎬 Hiệu Ứng 3D:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", padx=4, pady=4)
+        # Hàng 1: Khung Ảnh, Width, Height (Mặc định 1376x768 16:9 Widescreen)
+        ttk.Label(opts_card, text="📐 Mẫu Khung Ảnh:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", padx=4, pady=4)
+
+        self.img_preset_var = tk.StringVar(value="1376 x 768 (16:9 Widescreen - Mặc định)")
+        cmb_img_preset = ttk.Combobox(opts_card, textvariable=self.img_preset_var, values=list(RESOLUTION_PRESETS.keys()), state="readonly", width=26)
+        cmb_img_preset.grid(row=0, column=1, padx=4, pady=4)
+        cmb_img_preset.bind("<<ComboboxSelected>>", self.on_img_resolution_preset_changed)
+
+        ttk.Label(opts_card, text="Width:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=2, padx=4, pady=4)
+        self.spn_img_width = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
+        self.spn_img_width.set(1376)
+        self.spn_img_width.grid(row=0, column=3, padx=4, pady=4)
+
+        ttk.Label(opts_card, text="Height:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=4, padx=4, pady=4)
+        self.spn_img_height = ttk.Spinbox(opts_card, from_=256, to=2048, increment=64, width=6)
+        self.spn_img_height.set(768)
+        self.spn_img_height.grid(row=0, column=5, padx=4, pady=4)
+
+        # Hàng 2: Hiệu ứng 3D, Thời lượng (Giây), FPS
+        ttk.Label(opts_card, text="🎬 Hiệu Ứng 3D:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", padx=4, pady=4)
 
         self.img_motion_var = tk.StringVar(value="random")
         cmb_img_motion = ttk.Combobox(
@@ -544,10 +573,10 @@ class ProfessionalVideoStudioApp(tk.Tk):
             state="readonly",
             width=24,
         )
-        cmb_img_motion.grid(row=0, column=1, padx=4, pady=4)
+        cmb_img_motion.grid(row=1, column=1, padx=4, pady=4)
         cmb_img_motion.set(MOTION_LABELS["random"])
 
-        ttk.Label(opts_card, text="⏱️ Thời Lượng:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=2, padx=4, pady=4)
+        ttk.Label(opts_card, text="⏱️ Thời Lượng:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=2, padx=4, pady=4)
         self.img_duration_var = tk.StringVar(value="8s (Mặc định)")
         cmb_img_duration = ttk.Combobox(
             opts_card,
@@ -556,36 +585,27 @@ class ProfessionalVideoStudioApp(tk.Tk):
             state="readonly",
             width=12,
         )
-        cmb_img_duration.grid(row=0, column=3, padx=4, pady=4)
+        cmb_img_duration.grid(row=1, column=3, padx=4, pady=4)
         cmb_img_duration.bind("<<ComboboxSelected>>", self.on_img_duration_changed)
 
-        ttk.Label(opts_card, text="FPS:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=0, column=4, padx=4, pady=4)
+        ttk.Label(opts_card, text="FPS:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=4, padx=4, pady=4)
         self.spn_img_fps = ttk.Spinbox(
             opts_card, from_=5, to=60, increment=1, width=6, command=self.on_img_duration_changed
         )
         self.spn_img_fps.set(20)  # MẶC ĐỊNH 20 FPS
-        self.spn_img_fps.grid(row=0, column=5, padx=4, pady=4)
+        self.spn_img_fps.grid(row=1, column=5, padx=4, pady=4)
         self.spn_img_fps.bind("<KeyRelease>", lambda e: self.on_img_duration_changed())
 
-        # Hàng 2: Số Frame (tự nhảy theo Giây), SỐ LUỒNG (WORKERS)
-        ttk.Label(opts_card, text="🎞️ Số Frame:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="w", padx=4, pady=4)
-        self.spn_img_frames = ttk.Spinbox(opts_card, from_=10, to=1200, increment=10, width=10)
+        # Hàng 3: Số Frame (tự nhảy theo Giây), SỐ LUỒNG (WORKERS)
+        ttk.Label(opts_card, text="🎞️ Số Frame:", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky="w", padx=4, pady=4)
+        self.spn_img_frames = ttk.Spinbox(opts_card, from_=10, to=2400, increment=10, width=10)
         self.spn_img_frames.set(160)  # MẶC ĐỊNH 160 FRAMES (8s * 20 FPS)
-        self.spn_img_frames.grid(row=1, column=1, sticky="w", padx=4, pady=4)
+        self.spn_img_frames.grid(row=2, column=1, sticky="w", padx=4, pady=4)
 
-        ttk.Label(opts_card, text="⚡ Số Luồng (Workers):", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=1, column=2, sticky="w", padx=4, pady=4)
+        ttk.Label(opts_card, text="⚡ Số Luồng (Workers):", style="Card.TLabel", font=("Segoe UI", 10, "bold")).grid(row=2, column=2, sticky="w", padx=4, pady=4)
         self.spn_img_threads = ttk.Spinbox(opts_card, from_=1, to=4, increment=1, width=6)
         self.spn_img_threads.set(4)  # MẶC ĐỊNH 4 LUỒNG CHO IMAGE TO VIDEO
-        self.spn_img_threads.grid(row=1, column=3, sticky="w", padx=4, pady=4)
-
-    def on_img_duration_changed(self, event=None):
-        try:
-            sec = parse_duration_seconds(self.img_duration_var.get())
-            fps = int(self.spn_img_fps.get())
-            frames = sec * fps
-            self.spn_img_frames.set(frames)
-        except Exception:
-            pass
+        self.spn_img_threads.grid(row=2, column=3, sticky="w", padx=4, pady=4)
 
         btn_action_frame = ttk.Frame(self.tab_image)
         btn_action_frame.pack(fill="x", pady=8)
@@ -597,6 +617,15 @@ class ProfessionalVideoStudioApp(tk.Tk):
 
         self.btn_stop_img = ttk.Button(btn_action_frame, text="⏹️ DỪNG TIẾN TRÌNH", style="Danger.TButton", command=self.request_stop, state="disabled")
         self.btn_stop_img.pack(side="left")
+
+    def on_img_duration_changed(self, event=None):
+        try:
+            sec = parse_duration_seconds(self.img_duration_var.get())
+            fps = int(self.spn_img_fps.get())
+            frames = sec * fps
+            self.spn_img_frames.set(frames)
+        except Exception:
+            pass
 
     # ================= LOG & STATUS MONITOR UTILS =================
     def status_log(self, message: str):
@@ -899,7 +928,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
                     if res.status_code == 202:
                         task_id = res.json().get("task_id")
                         self.status_log(f"✅ POST 202 Accepted | Task ID: {task_id}")
-                        safe_title = "".join(c if c.isalnum() else "_" for c in prompt[:20]).strip("_")
+                        safe_title = "".join(c if c.isalnum() else "_" for c in prompt[:20]).strip("_") or "prompt"
                         save_filename = f"text_{idx:03d}_{safe_title}_{effect}.mp4"
 
                         success = self.wait_and_download_task(base_url, task_id, save_filename)
@@ -972,7 +1001,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
                     if res.status_code == 202:
                         task_id = res.json().get("task_id")
                         self.status_log(f"✅ POST 202 Accepted | Task ID: {task_id}")
-                        safe_title = "".join(c if c.isalnum() else "_" for c in prompt[:20]).strip("_")
+                        safe_title = "".join(c if c.isalnum() else "_" for c in prompt[:20]).strip("_") or "prompt"
                         save_filename = f"image_{idx:03d}_{safe_title}.png"
 
                         self.wait_and_download_image_only_task(base_url, task_id, save_filename)
@@ -1033,12 +1062,14 @@ class ProfessionalVideoStudioApp(tk.Tk):
         self.set_buttons_state(True)
 
         base_url = self.get_api_base()
+        width = int(self.spn_img_width.get())
+        height = int(self.spn_img_height.get())
         num_frames = int(self.spn_img_frames.get())
         fps = int(self.spn_img_fps.get())
         max_workers = max(1, min(4, int(self.spn_img_threads.get())))
         selected_motion_label = self.img_motion_var.get()
 
-        self.status_log(f"🚀 Bắt đầu Batch {len(files)} Ảnh (Base64 Mode) - Chạy {max_workers} Luồng Song Song...")
+        self.status_log(f"🚀 Bắt đầu Batch {len(files)} Ảnh (Base64 Mode) - {width}x{height} - Chạy {max_workers} Luồng Song Song...")
 
         def process_single_image(idx_and_file):
             idx, img_file = idx_and_file
@@ -1046,7 +1077,7 @@ class ProfessionalVideoStudioApp(tk.Tk):
                 return
 
             effect = self.get_selected_motion_code(selected_motion_label)
-            self.status_log(f"\n--- [Luồng {threading.current_thread().name}] [{idx}/{len(files)}] File ảnh: '{img_file.name}' | Hiệu ứng: {effect} ---")
+            self.status_log(f"\n--- [Luồng {threading.current_thread().name}] [{idx}/{len(files)}] File ảnh: '{img_file.name}' | {width}x{height} | Hiệu ứng: {effect} ---")
 
             try:
                 with open(img_file, "rb") as f:
@@ -1059,6 +1090,8 @@ class ProfessionalVideoStudioApp(tk.Tk):
                     "num_frames": num_frames,
                     "fps": fps,
                     "prompt": f"Render Image: {img_file.stem}",
+                    "width": width,
+                    "height": height,
                 }
 
                 self.status_log(f"📤 POST /generate-from-image | Image: {img_file.name}")
