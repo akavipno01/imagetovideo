@@ -13,11 +13,11 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
 from .config import (
-    DEFAULT_SD_MODEL,
     DEFAULT_Z_IMAGE_GGUF_URL,
     DEFAULT_Z_IMAGE_MODEL,
     IMAGES_DIR,
-    SD_MODEL_DIR,
+    LOCAL_Z_IMAGE_GGUF,
+    MODELS_DIR,
     VIDEOS_DIR,
 )
 from .database import update_task_progress
@@ -60,7 +60,7 @@ def runtime_state() -> Dict[str, Any]:
     return {
         **_state,
         **dev_info,
-        "model_dir": str(SD_MODEL_DIR),
+        "model_dir": str(MODELS_DIR),
     }
 
 
@@ -74,7 +74,7 @@ def get_pipeline():
         device = dev_info["device"]
 
         # =========================================================================
-        # 1. Thử nghiệm nạp Z-Image-Turbo (GGUF DiT + Qwen 4-bit text encoder)
+        # Nạp duy nhất mô hình Z-Image-Turbo (GGUF DiT + Qwen 4-bit)
         # =========================================================================
         if device == "cuda":
             try:
@@ -158,44 +158,10 @@ def get_pipeline():
                 import traceback
                 print(f"❌ LỖI NẠP Z-Image-Turbo: {e}")
                 traceback.print_exc()
-                print("⚠️ Thử chuyển sang Stable Diffusion fallback...")
-
-        # =========================================================================
-        # 2. Thử nghiệm nạp Stable Diffusion (SD 1.5 / SDXL)
-        # =========================================================================
-        try:
-            import torch
-            from diffusers import EulerDiscreteScheduler, StableDiffusionPipeline
-
-            print(f"Loading Stable Diffusion pipeline on {device}...")
-            dtype = torch.float16 if device == "cuda" else torch.float32
-            pipeline = StableDiffusionPipeline.from_pretrained(
-                DEFAULT_SD_MODEL,
-                torch_dtype=dtype,
-                safety_checker=None,
-            )
-            pipeline.scheduler = EulerDiscreteScheduler.from_config(pipeline.scheduler.config)
-            pipeline.to(device)
-            if device == "cuda":
-                pipeline.enable_attention_slicing()
-                try:
-                    pipeline.enable_vae_slicing()
-                except Exception:
-                    pass
-                try:
-                    pipeline.enable_vae_tiling()
-                except Exception:
-                    pass
-
-            _pipeline = pipeline
-            _state["status"] = "loaded"
-            _state["device"] = device
-            _state["model_type"] = "stable_diffusion"
-            _state["model_id"] = DEFAULT_SD_MODEL
-            print("Stable Diffusion pipeline loaded successfully!")
-            return _pipeline
-        except Exception as e:
-            print(f"Diffusers pipeline load notice: {e}. Active mode: Dynamic Generation Engine.")
+                _state["status"] = f"error: {e}"
+                raise RuntimeError(f"Không thể nạp mô hình Z-Image-Turbo trên GPU: {e}")
+        else:
+            print("⚠️ Cảnh báo: Không tìm thấy GPU CUDA. Cần GPU để chạy Z-Image-Turbo.")
             return None
 
 
@@ -273,54 +239,31 @@ def process_generation_task(
 
         if pipe is not None:
             import torch
-            if model_type == "z_image_turbo":
-                turbo_steps = max(4, min(12, num_inference_steps)) if num_inference_steps else 9
-                update_task_progress(
-                    task_id,
-                    status="generating_image",
-                    progress=25.0,
-                    detail=f"Đang sinh ảnh siêu nét Z-Image-Turbo ({turbo_steps} steps, {width}x{height})...",
+            turbo_steps = max(4, min(12, num_inference_steps)) if num_inference_steps else 9
+            update_task_progress(
+                task_id,
+                status="generating_image",
+                progress=25.0,
+                detail=f"Đang sinh ảnh siêu nét Z-Image-Turbo ({turbo_steps} steps, {width}x{height})...",
+            )
+            seed = random.randint(1, 2147483647)
+            generator = torch.Generator("cuda").manual_seed(seed)
+            with torch.inference_mode():
+                res = pipe(
+                    prompt=prompt,
+                    height=height,
+                    width=width,
+                    num_inference_steps=turbo_steps,
+                    guidance_scale=0.0,
+                    generator=generator,
+                    num_images_per_prompt=1,
                 )
-                seed = random.randint(1, 2147483647)
-                generator = torch.Generator("cuda").manual_seed(seed)
-                with torch.inference_mode():
-                    res = pipe(
-                        prompt=prompt,
-                        height=height,
-                        width=width,
-                        num_inference_steps=turbo_steps,
-                        guidance_scale=0.0,
-                        generator=generator,
-                        num_images_per_prompt=1,
-                    )
-                image = res.images[0]
-            else:
-                # Sinh ảnh bằng PyTorch Diffusers SD pipeline
-                def step_callback(step: int, timestep: int, latents: Any):
-                    prog = 10.0 + (step / max(1, num_inference_steps)) * 40.0
-                    update_task_progress(
-                        task_id,
-                        status="generating_image",
-                        progress=round(prog, 1),
-                        detail=f"Đang sinh ảnh AI... Bước {step}/{num_inference_steps}",
-                    )
-
-                with torch.inference_mode():
-                    res = pipe(
-                        prompt=prompt,
-                        negative_prompt=negative_prompt if negative_prompt else None,
-                        width=width,
-                        height=height,
-                        num_inference_steps=num_inference_steps,
-                        callback=step_callback,
-                        callback_steps=max(1, num_inference_steps // 5),
-                    )
-                image = res.images[0]
+            image = res.images[0]
 
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         else:
-            # Fallback canvas khi chưa có weights hoặc test local CPU
+            # Fallback canvas chỉ khi test local trên CPU không có GPU
             time.sleep(1.0)
             image = generate_fallback_image(prompt, width, height)
 
@@ -515,52 +458,31 @@ def process_image_only_task(
 
         if pipe is not None:
             import torch
-            if model_type == "z_image_turbo":
-                turbo_steps = max(4, min(12, num_inference_steps)) if num_inference_steps else 9
-                update_task_progress(
-                    task_id,
-                    status="generating_image",
-                    progress=40.0,
-                    detail=f"Đang sinh ảnh siêu nét Z-Image-Turbo ({turbo_steps} steps, {width}x{height})...",
+            turbo_steps = max(4, min(12, num_inference_steps)) if num_inference_steps else 9
+            update_task_progress(
+                task_id,
+                status="generating_image",
+                progress=40.0,
+                detail=f"Đang sinh ảnh siêu nét Z-Image-Turbo ({turbo_steps} steps, {width}x{height})...",
+            )
+            seed = random.randint(1, 2147483647)
+            generator = torch.Generator("cuda").manual_seed(seed)
+            with torch.inference_mode():
+                res = pipe(
+                    prompt=prompt,
+                    height=height,
+                    width=width,
+                    num_inference_steps=turbo_steps,
+                    guidance_scale=0.0,
+                    generator=generator,
+                    num_images_per_prompt=1,
                 )
-                seed = random.randint(1, 2147483647)
-                generator = torch.Generator("cuda").manual_seed(seed)
-                with torch.inference_mode():
-                    res = pipe(
-                        prompt=prompt,
-                        height=height,
-                        width=width,
-                        num_inference_steps=turbo_steps,
-                        guidance_scale=0.0,
-                        generator=generator,
-                        num_images_per_prompt=1,
-                    )
-                image = res.images[0]
-            else:
-                def step_callback(step: int, timestep: int, latents: Any):
-                    prog = 10.0 + (step / max(1, num_inference_steps)) * 85.0
-                    update_task_progress(
-                        task_id,
-                        status="generating_image",
-                        progress=round(prog, 1),
-                        detail=f"Đang sinh ảnh AI... Bước {step}/{num_inference_steps}",
-                    )
-
-                with torch.inference_mode():
-                    res = pipe(
-                        prompt=prompt,
-                        negative_prompt=negative_prompt if negative_prompt else None,
-                        width=width,
-                        height=height,
-                        num_inference_steps=num_inference_steps,
-                        callback=step_callback,
-                        callback_steps=max(1, num_inference_steps // 5),
-                    )
-                image = res.images[0]
+            image = res.images[0]
 
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         else:
+            # Fallback canvas chỉ khi test local trên CPU không có GPU
             time.sleep(1.0)
             image = generate_fallback_image(prompt, width, height)
 
